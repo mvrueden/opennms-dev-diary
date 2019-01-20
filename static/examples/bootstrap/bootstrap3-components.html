@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bootstrap all elements</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+  <!-- Optional theme -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.5.10/clipboard.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<style type="text/css">
+  .mt-2 {
+    margin-top: 0.75em;
+  }
+  .mt-3 {
+    margin-top: 1.125em;
+  }
+</style>
+
+<nav class="navbar navbar-expand-lg navbar-default bg-primary">
+  <div class="container-fluid">
+    <!-- Brand and toggle get grouped for better mobile display -->
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="#">Navbar</a>
+    </div>
+
+  <div class="collapse navbar-collapse" id="navbarTogglerDemo03">
+    <ul class="nav navbar-nav">
+      <li class="active">
+        <a class="" href="#!">Home
+          <span class="sr-only">(current)</span>
+        </a>
+      </li>
+      <li class="">
+        <a class="" href="#!">Link</a>
+      </li>
+      <li class="">
+        <a class="disabled" href="#!">Disabled</a>
+      </li>
+    </ul>
+    <form class="navbar-form navbar-right">
+      <div class="form-group">
+        <input type="text" class="form-control" placeholder="Search">
+      </div>
+    </form>
+  </div>
+  </div>
+</nav>
+
+<div class="container-fluid">
+  <div class="row mt-3">
+    <div class="col-md-3 col-sm-6">
+
+      <!--Body text-->
+      <p>Hello. I'm a little bit of body text. Plain and simple.</p>
+
+      <!--Badges-->
+      <span class="label label-default">Default</span>
+      <span class="label label-primary">Primary</span>
+      <span class="label label-success">Success</span>
+      <span class="label label-danger">Danger</span>
+      <span class="label label-warning">Warning</span>
+      <span class="label label-info">Info</span>
+
+      <!--Breadcrumb-->
+      <nav aria-label="breadcrumb" role="navigation">
+        <ol class="breadcrumb mt-2">
+          <li><a href="#">Home</a></li>
+          <li><a href="#">Library</a></li>
+          <li class="active">Data</li>
+        </ol>
+      </nav>
+
+      <!--Buttons-->
+      <div>
+        <button type="button" class="btn btn-default">Default</button>
+        <button type="button" class="btn btn-primary">Primary</button>
+        <button type="button" class="btn btn-success">Success</button>
+        <button type="button" class="btn btn-danger">Danger</button>
+        <button type="button" class="btn btn-warning">Warning</button>
+        <button type="button" class="btn btn-info">Info</button>
+      </div>
+
+      <!--Checkbox buttons-->
+      <div class="mt-3">
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-default active">
+            <input type="checkbox" checked autocomplete="off"> Yes
+          </label>
+          <label class="btn btn-default">
+            <input type="checkbox" autocomplete="off"> No
+          </label>
+        </div>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-primary active">
+            <input type="checkbox" checked autocomplete="off"> Yes
+          </label>
+          <label class="btn btn-primary">
+            <input type="checkbox" autocomplete="off"> No
+          </label>
+        </div>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-success active">
+            <input type="checkbox" checked autocomplete="off"> Yes
+          </label>
+          <label class="btn btn-success">
+            <input type="checkbox" autocomplete="off"> No
+          </label>
+        </div>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-danger active">
+            <input type="checkbox" checked autocomplete="off"> Yes
+          </label>
+          <label class="btn btn-danger">
+            <input type="checkbox" autocomplete="off"> No
+          </label>
+        </div>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-warning active">
+            <input type="checkbox" checked autocomplete="off"> Yes
+          </label>
+          <label class="btn btn-warning">
+            <input type="checkbox" autocomplete="off"> No
+          </label>
+        </div>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+          <label class="btn btn-info active">
+            <input type="checkbox" checked autocomplete="off"> Yes
+          </label>
+          <label class="btn btn-info">
+            <input type="checkbox" autocomplete="off"> No
+          </label>
+        </div>
+      </div>
+
+      <!--Dropdown buttons-->
+      <div class="mt-3">
+        <div class="btn-group">
+          <button type="button" class="btn btn-default">Default</button>
+          <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="caret"></span>
+            <span class="sr-only">Toggle Dropdown</span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a href="#">Action</a></li>
+            <li><a href="#">Another action</a></li>
+            <li><a href="#">Something else here</a></li>
+            <li role="separator" class="divider"></li>
+            <li><a href="#">Separated link</a></li>
+          </ul>
+        </div> <!-- /btn-group -->
+        <div class="btn-group">
+          <button type="button" class="btn btn-primary">Primary</button>
+          <button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="caret"></span>
+            <span class="sr-only">Toggle Dropdown</span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a href="#">Action</a></li>
+            <li><a href="#">Another action</a></li>
+            <li><a href="#">Something else here</a></li>
+            <li role="separator" class="divider"></li>
+            <li><a href="#">Separated link</a></li>
+          </ul>
+        </div> <!-- /btn-group -->
+        <div class="btn-group">
+          <button type="button" class="btn btn-success">Success</button>
+          <button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="caret"></span>
+            <span class="sr-only">Toggle Dropdown</span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a href="#">Action</a></li>
+            <li><a href="#">Another action</a></li>
+            <li><a href="#">Something else here</a></li>
+            <li role="separator" class="divider"></li>
+            <li><a href="#">Separated link</a></li>
+          </ul>
+        </div> <!-- /btn-group -->
+      </div>
+      <div class="mt-2">
+        <div class="btn-group">
+          <button type="button" class="btn btn-info">Info</button>
+          <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="caret"></span>
+            <span class="sr-only">Toggle Dropdown</span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a href="#">Action</a></li>
+            <li><a href="#">Another action</a></li>
+            <li><a href="#">Something else here</a></li>
+            <li role="separator" class="divider"></li>
+            <li><a href="#">Separated link</a></li>
+          </ul>
+        </div> <!-- /btn-group -->
+        <div class="btn-group">
+          <button type="button" class="btn btn-warning">Warning</button>
+          <button type="button" class="btn btn-warning dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="caret"></span>
+            <span class="sr-only">Toggle Dropdown</span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a href="#">Action</a></li>
+            <li><a href="#">Another action</a></li>
+            <li><a href="#">Something else here</a></li>
+            <li role="separator" class="divider"></li>
+            <li><a href="#">Separated link</a></li>
+          </ul>
+        </div> <!-- /btn-group -->
+        <div class="btn-group">
+          <button type="button" class="btn btn-danger">Danger</button>
+          <button type="button" class="btn btn-danger dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="caret"></span>
+            <span class="sr-only">Toggle Dropdown</span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a href="#">Action</a></li>
+            <li><a href="#">Another action</a></li>
+            <li><a href="#">Something else here</a></li>
+            <li role="separator" class="divider"></li>
+            <li><a href="#">Separated link</a></li>
+          </ul>
+        </div> <!-- /btn-group -->
+
+      </div>
+
+
+      <!--Forms-->
+      <div class="mt-3">
+        <form>
+          <div class="form-group">
+            <label for="exampleInputEmail1">Form label</label>
+            <input type="email" class="form-control" id="exampleInputEmail1" placeholder="Enter">
+            <small id="emailHelp" class="help-block">Form Text - To give hints and things</small>
+          </div>
+        </form>
+
+      </div>
+
+      <div class="mt-2">
+        <div class="checkbox">
+          <label>
+            <input type="checkbox" value=""> Custom Check
+          </label>
+        </div>
+        <div class="radio">
+          <label>
+            <input type="radio" name="optionsRadios" id="optionsRadios1" value="option1" checked> Custom radio
+          </label>
+          <label>
+            <input type="radio" name="optionsRadios" id="optionsRadios2" value="option2" checked> Custom radio 2
+          </label>
+        </div>
+      </div>
+      <div class="mt-2">
+        <div class="custom-control custom-checkbox">
+          <input type="checkbox" class="custom-control-input" id="customCheck1">
+          <label class="custom-control-label" for="customCheck1">Custom check</label>
+        </div>
+        <div class="custom-control custom-radio">
+          <input type="radio" id="customRadio1" name="customRadio" class="custom-control-input">
+          <label class="custom-control-label" for="customRadio1">Custom radio</label>
+        </div>
+        <select class="form-control">
+          <option selected>Custom select menu</option>
+          <option value="1">One</option>
+          <option value="2">Two</option>
+          <option value="3">Three</option>
+        </select>
+      </div>
+
+      <div class="mt-2">
+        <label class="custom-file">
+          <input type="file" id="file" class="custom-file-input">
+          <span class="custom-file-control"></span>
+        </label>
+      </div>
+
+
+      <!--Pagination-->
+      <div class="mt-2">
+        <nav aria-label="...">
+          <ul class="pagination">
+            <li class="page-item disabled">
+              <span class="page-link">Previous</span>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="#!">1</a>
+            </li>
+            <li class="page-item active">
+              <span class="page-link">
+                2
+                <span class="sr-only">(current)</span>
+              </span>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="#!">3</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="#!">Next</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+      <div class="mt-2">
+
+        <div class="progress">
+          <div class="progress-bar progress-bar-primary" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="progress-bar progress-bar-success" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="progress-bar progress-bar-info" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="progress-bar progress-bar-warning" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="progress-bar progress-bar-danger" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+
+        <div class="progress mt-2">
+          <div class="progress-bar progress-bar-striped progress-bar-primary" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="progress-bar progress-bar-striped progress-bar-success" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="progress-bar progress-bar-striped progress-bar-info" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="progress-bar progress-bar-striped progress-bar-warning" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="progress-bar progress-bar-striped progress-bar-danger" role="progressbar"
+               style="width: 20%" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+
+      </div>
+
+
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+
+      <!--Alerts-->
+      <div class="mb-2 alert alert-success" role="alert">
+        This is a success alert with <a href="#" class="alert-link">an example link</a>.
+      </div>
+      <div class="mb-2 alert alert-danger" role="alert">
+        This is a danger alert with <a href="#" class="alert-link">an example link</a>.
+      </div>
+      <div class="mb-2 alert alert-warning" role="alert">
+        This is a warning alert with <a href="#" class="alert-link">an example link</a>.
+      </div>
+      <div class="mb-2 alert alert-info" role="alert">
+        This is a info alert with <a href="#" class="alert-link">an example link</a>.
+      </div>
+
+
+      <div class="mt-2">
+        <ul class="list-group">
+          <li class="list-group-item list-group-item-success">Dapibus ac facilisis in</li>
+          <li class="list-group-item list-group-item-danger">Porta ac consectetur ac</li>
+          <li class="list-group-item list-group-item-warning">Vestibulum at eros</li>
+          <li class="list-group-item list-group-item-info">Cras justo odio</li>
+        </ul>
+      </div>
+    </div>
+
+    <!--Panels-->
+    <div class="col-md-6 mt-lg-0 mt-4" >
+      <div class="row">
+        <div class="col-sm-6">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Panel title</h3>
+            </div>
+            <div class="panel-body">
+              Some quick example text to build on the panel title and make up the
+              bulk of the panels's content.
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6">
+          <div class="panel panel-primary">
+            <div class="panel-heading">
+              <h3 class="panel-title">Panel title</h3>
+            </div>
+            <div class="panel-body">
+              Some quick example text to build on the panel title and make up the
+              bulk of the panels's content.
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6">
+          <div class="panel panel-success">
+            <div class="panel-heading">
+              <h3 class="panel-title">Panel title</h3>
+            </div>
+            <div class="panel-body">
+              Some quick example text to build on the panel title and make up the
+              bulk of the panels's content.
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6">
+          <div class="panel panel-danger">
+            <div class="panel-heading">
+              <h3 class="panel-title">Panel title</h3>
+            </div>
+            <div class="panel-body">
+              Some quick example text to build on the panel title and make up the
+              bulk of the panels's content.
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6">
+          <div class="panel panel-warning">
+            <div class="panel-heading">
+              <h3 class="panel-title">Panel title</h3>
+            </div>
+            <div class="panel-body">
+              Some quick example text to build on the panel title and make up the
+              bulk of the panels's content.
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6">
+          <div class="panel panel-info">
+            <div class="panel-heading">
+              <h3 class="panel-title">Panel title</h3>
+            </div>
+            <div class="panel-body">
+              Some quick example text to build on the panel title and make up the
+              bulk of the panels's content.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div>
+
+        <table class="table table-hover table-striped table-">
+          <thead class="bg-primary">
+          <tr>
+            <th>#</th>
+            <th>Column</th>
+            <th>Column</th>
+            <th>Column</th>
+            <th>Column</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr>
+            <th scope="row">1</th>
+            <td class="default">Content</td>
+            <td class="bg-primary">Content</td>
+            <td class="default">Content</td>
+            <td class="bg-primary">Content</td>
+          </tr>
+          <tr>
+            <th scope="row">2</th>
+            <td class="warning">Content</td>
+            <td class="info">Content</td>
+            <td class="success">Content</td>
+            <td class="danger">Content</td>
+          </tr>
+
+          <tr class="success">
+            <th scope="row">1</th>
+            <td class="">Content</td>
+            <td class="">Content</td>
+            <td class="">Content</td>
+            <td class="">Content</td>
+          </tr>
+          <tr class="warning">
+            <th scope="row">2</th>
+            <td class="">Content</td>
+            <td class="">Content</td>
+            <td class="">Content</td>
+            <td class="">Content</td>
+          </tr>
+          <tr class="info">
+            <th scope="row">2</th>
+            <td class="">Content</td>
+            <td class="">Content</td>
+            <td class="">Content</td>
+            <td class="">Content</td>
+          </tr>
+          <tr class="danger">
+            <th scope="row">2</th>
+            <td class="">Content</td>
+            <td class="">Content</td>
+            <td class="">Content</td>
+            <td class="">Content</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+
+</body>
+</html>
