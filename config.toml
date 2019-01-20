@@ -1,0 +1,4 @@
+baseURL = "http://diary.marskuh.de/"
+languageCode = "en-us"
+title = "The Mole's OpenNMS (TM) Dev Diary"
+theme = "ananke"
