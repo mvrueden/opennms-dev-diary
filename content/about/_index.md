@@ -3,7 +3,7 @@ title: "About"
 description: "Regulary I am faced with the situation that the reasons for a certain development decisions were made are unclear after a couple of years/months ago. Hopefully documenting them will help to fill that gap."
 featured_image: ''
 ---
-{{< figure src="/images/ulf-food.jpg" title="Illustration from Victor Hugo et son temps (1881)" >}}
+{{< figure src="/images/ulf-food.jpg" title="Ulf finds himself in a precarious situation" >}}
 
 Sometimes it is quite hard to remember all the nits and problems me or others encountered while developing, when looking at a certain implementation a couple of months or even years later.
 We all can agree, that it must be a reason for a certain path, but usually notes taken are either lost, or not searchable (no manual `ctrl + f` implementation yet).
