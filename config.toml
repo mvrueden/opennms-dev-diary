@@ -4,10 +4,11 @@ title = "The Mole's OpenNMS (TM) Dev Diary"
 theme = "ananke"
 
 SectionPagesMenu = "main"
-Paginate = 3 # this is set low for demonstrating with dummy content. Set to a higher number
+Paginate = 10
 
 [params]
   github = "https://github.com/mvrueden/opennms-dev-diary"
   background_color_class = "bg-black"
   description = "The last theme adsfasdf'll ever need. Maybe."
   featured_image = "/images/featured-ulf.jpg"
+  recent_posts_number = 5

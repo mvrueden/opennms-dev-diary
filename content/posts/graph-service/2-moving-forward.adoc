@@ -1,0 +1,33 @@
+---
+title: "Graph Service - Moving Forward"
+date: 2019-01-21T15:00:00+01:00
+tags: ["topology", "graph"]
+draft: false
+---
+
+With the POC new implementation we could solve the current problems of the Topology in OpenNMS.
+
+The next step is to take what was learned and implement something similar and more robust in OpenNMS.
+ 
+As this is a big chunk to swallow, the main issue here is on how to split the work into small pieces, 
+as with this kind of API you basically have to almost implement everything before it can be used.
+
+The initial implementation will provide all required modules and classes/interfaces to allow implementing a provider, such as `Vmware` and allow using mechanisms like
+change detection and persistence. Where these services do not need to be fully implemented.
+
+Must implement
+
+ - API for graph service (Vertex, etc.)
+ - API for graph persistence (VertexEntity, PersistenceService, etc.)
+ - API for abstract conversion (GenericVertex, etc.) to later on provide those as JSON and XML
+ - Simulate de-coupled loading of graph
+ - API to search/enrich
+
+Probably implement
+
+ - Default Graph Provider, such as GraphML
+
+May implement later
+
+ - concrete persistence (Graph Database, or Postgres, etc.)
+ - concrete graph providers (e.g. vmware, etc.)

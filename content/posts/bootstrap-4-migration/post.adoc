@@ -3,6 +3,7 @@ title: "Bootstrap 3 to 4 Migration"
 date: 2019-01-20T13:29:25+01:00
 tags: ["refactoring", "bootstrap"]
 draft: false
+featured_image: "/posts/bootstrap-4-migration/login.png"
 ---
 
 In OpenNMS we use `Bootstrap 3` as a library to help styling web pages.

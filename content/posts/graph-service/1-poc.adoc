@@ -1,0 +1,33 @@
+---
+title: "Graph Service - Proof of Concept"
+date: 2019-01-20T14:00:00+01:00
+tags: ["poc", "topology", "graph"]
+draft: false
+featured_image: "https://camo.githubusercontent.com/105a3e590a013d0540bb1c2f4ff62d2291f88bc3/68747470733a2f2f77696b692e6f70656e6e6d732e6f72672f77696b692f696d616765732f332f33302f546f706c6f67792d67726170682e706e67"
+---
+
+The Topology Map in OpenNMS has some architectural problems.
+Mainly that there is no "service layer" implemented, which causes mostly performance issues.
+Besides this no API or persistence model is enforced.
+This prevents easy integration with 3rd party applications or even provide a new UI implementation.
+
+Therefore I started playing around with a new Topology implementation (See issue link:https://issues.opennms.org/browse/HZN-1452[HZN-1452]) for more details).
+In order to not confuse it with existing implementations, it is called `Graph Service` or `Graph Engine` here.
+The core of this implementation should be a `Graph Service` which works on a pre-defined `Graph Model` to allow for an easier integration with other systems,
+as well as to persist existing topologies and also expose them either as XML or JSON.
+
+A first prototype was implemented focussing mostly on the following problems:
+
+ - Loading of the Graph is asynchronous and only if the graph is fully loaded, it is available.
+   While requests for the same graph, will still return the already loaded version.
+   If the graph reloads, it is replacing the existing graph when fully loaded.
+ - The graph MUST not always be loaded. The prototype however did that.
+ - A clear model, which can be used to share Graphs within OpenNMS
+ - A clear model to export/import Graphs
+ - Possibilty to persist graphs (e.g. into postgres, or later in a graph database)
+ - Better SearchProvider implementation
+ - Add capability to lazy load heavy properties to a vertex/edge, to improve performance.
+ - Detect changes to implement some kind of timeline and only send updates which allows to build graphs over time
+
+The prototype is in a Proof-Of-Concept branch and can be reviewed link:https://github.com/mvrueden/opennms-graph-service[here]
+
