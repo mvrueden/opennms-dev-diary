@@ -1,4 +1,4 @@
-baseURL = "http://diary.marskuh.de/"
+baseURL = "http://opennms-dev-diary.netlify.com" # for now use this
 languageCode = "en-us"
 title = "The Mole's OpenNMS (TM) Dev Diary"
 theme = "ananke"
