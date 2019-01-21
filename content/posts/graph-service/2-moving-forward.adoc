@@ -5,7 +5,7 @@ tags: ["topology", "graph"]
 draft: false
 ---
 
-With the POC new implementation we could solve the current problems of the Topology in OpenNMS.
+With the new POC implementation we could solve the current problems of the Topology in OpenNMS.
 
 The next step is to take what was learned and implement something similar and more robust in OpenNMS.
  
