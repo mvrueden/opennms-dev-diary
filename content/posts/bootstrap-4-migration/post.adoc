@@ -1,0 +1,64 @@
+---
+title: "Bootstrap 3 to 4 Migration"
+date: 2019-01-20T13:29:25+01:00
+tags: ["refactoring", "bootstrap"]
+draft: false
+---
+
+In OpenNMS we use `Bootstrap 3` as a library to help styling web pages.
+However the style sheets are customized in a way, that they are not `bootstrap-compatible` anymore.
+
+.Bootstrap 3 Default Theme
+image::/context/bootstrap4-migration/images/bootstrap3-raw.png[Bootstrap 3 Default Theme]
+
+.OpenNMS customized Bootstrap 3 Theme
+image::/context/bootstrap4-migration/images/bootstrap3-opennms.png[OpenNMS customized Bootstrap 3 Theme]
+
+As you can see, the custom stylings do not follow the bootstrap "schema", so each component is either not fully provided (e.g. list stylings or panels),
+or they are using a different context (The OpenNMS color's indicate the severity context, whereas the bootstrap `\*-info`, `*-warning`, etc. classes indicate a UI context).
+To me it always felt, that with the custom styling we originally applied the UI or components looked weird, especially the color combinations.
+
+Besides that, if you were to add `Bootstrap 3` components, they don't look like `Bootstrap 3` or follow their style guidelines (i.e. the panels). 
+With that I found myself very often either reverting our custom styling or adjust the result in a way, that it looks modern/nice and provides a somewhat useful result.
+
+The user experience with OpenNMS is not that great in general and I thought wouldn't it be nice to just rely on `Bootstrap 3` and be able to at least use the default components, which in return would increase the user experience.
+To implement this, I started ripping out all of our custom stylings and make the UI look "default".
+While doing that I really quick realized, that some components which are available in `Bootstrap 4` are missing.
+That is when I decided to migrate to `Bootstrap 4`, as it gives more possibilities in general.
+
+For comparison the following image contains the Bootstrap 4 Default Theme.
+
+.Bootstrap 4 Default Theme
+image::/context/bootstrap4-migration/images/bootstrap4-raw.png[Bootstrap 4 Default Theme]
+
+
+## Migration
+The migration per se was pretty straight forward.
+
+Mainly I followed the official link:https://getbootstrap.com/docs/4.0/migration/[Migration Guide].
+In order to not miss anything, a link:https://docs.google.com/spreadsheets/d/18cxvSMEBI4LDTTzmrFA_7CCRtSH-OOWoYV_4QCsDk2s[Google Sheet] helped to track the progress.
+
+Besides that the following problems had to be solved:
+ * Glyphicons are no longer part of bootstrap. Therefore the support was dropped and now only font-awesome Icons are available.
+ * Validation is rewritten, as `has-errors` is no longer available, but `is-invalid` is. Also some inputs are no longer showing visuals, but are replaced with a more unique concept.
+
+
+Here are some examples of how the ui looks with Bootstrap 4
+
+.Login
+image::/posts/bootstrap-4-migration/login.png[Login Screenshot]
+
+.Index
+image::/posts/bootstrap-4-migration/index.jpeg[Index Screenshot]
+
+.Node Page
+image::/posts/bootstrap-4-migration/node-page.jpeg[Node-Page Screenshot]
+
+.Search
+image::/posts/bootstrap-4-migration/search.jpeg[Search Screenshot]
+
+
+#### Sources:
+ * link:/context/bootstrap4-migration/source/bootstrap3-components.html[Bootstrap 3 Default Theme]
+ * link:/context/bootstrap4-migration/source/bootstrap3-components-opennms.jsp[OpenNMS customized Bootstrap 3 Theme]
+ * link:/context/bootstrap4-migration/source/bootstrap4-components.html[Bootstrap 4 Default Theme]
