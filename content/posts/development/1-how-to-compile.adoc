@@ -1,0 +1,59 @@
+---
+title: "Compiling OpenNMS"
+date: 2019-01-20T13:29:25+01:00
+tags: ["compiling", "development"]
+draft: true
+featured_image: ""
+---
+
+## Prerequirements
+
+In order to compile OpenNMS at least the following requirements should be met:
+
+1. The latest JDK should be installed. (At the moment OpenNMS does not compile with a java version greater than 9, this may change in the future)
+1. nsis
+1. cloned github opennms repository
+
+
+## Optional Requirements
+
+1. PostgreSQL server should be available (not for compiling, but for starting afterwards) 
+1. Jicmp, jicmp6
+1. maven
+
+## Building
+
+OpenNMS uses Maven as a build tool and is split in 2 basic modules:
+
+1. parent/root modules
+2. opennms-full-assembly 
+
+Usually when building all mvn goals must be run against those two modules.
+In order to make live easier, there are various help scripts available. 
+
+Simplified explanation:
+
+ - clean.pl -> Invokes `mvn clean` and `mvn clean -F opennms-full-assembly`
+ - compile.pl -> Compiles the root module (Invokes a `mvn install` on the root module)
+ - assemble.pl -> Builds the final assembly (opennms-<version>.tar.gz) (Invokes a `mvn install -F opennms-full-assembly`)
+
+Each script (except clean.pl) requires some arguments in order to configure OpenNMS correctly for later deployment.
+
+## Full build
+
+`cd ~/dev/opennms`
+`./clean.pl`
+./compile.pl -DskipTests` # Tests should not be executed
+`./assemble.pl -DskipTests` # Tests should not be executed, may provide -Dopennms.home if you want to deploy it somewhere else then `~/dev/opennms/target/opennms-<version>`
+
+## How I Build
+
+Regular development
+```
+time (./clean.pl && ./compile.pl -U -DskipTests && ./assemble.pl -p dir -DskipTests); say "OpenNMS may be ready for deployment"
+```
+
+When Deploying it somewhere else than locally on my machine
+```
+time (./clean.pl && ./compile.pl -DskipTests && ./assemble.pl -Dopennms.home=/opt/opennms -DskipTests); say "OpenNMS may be ready for deployment"
+```

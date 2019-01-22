@@ -1,0 +1,13 @@
+---
+title: "Run and Debug system tests"
+date: 2019-01-20T13:29:25+01:00
+tags: ["tests", "development"]
+draft: true
+featured_image: ""
+---
+
+- Use RPMs from Bamboo (link zum Script)
+- Ensure system test repository is checked out
+- run script
+
+Test wird genauso gestartet, mit etwas mehr parametern wie smoke test

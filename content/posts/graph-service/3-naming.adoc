@@ -1,0 +1,15 @@
+---
+title: "Graph Service - Naming"
+date: 2019-01-21T17:00:00+01:00
+tags: ["topology", "graph"]
+draft: true
+---
+
+Naming is hard.
+I found myself laying out a basic module structure for the new graph service modules and ended up with the following dilemma:
+
+To distinguish it from the old `topology` module I'd like to name it differently, e.g. `graph`.
+However `features/graph` indicates a single thing. 
+`features/graphs` on the other hand looks more fitting.
+In the end `features/topology` is the best fit.
+Maybe I just go with that instead.

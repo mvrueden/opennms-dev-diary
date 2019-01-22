@@ -1,0 +1,41 @@
+---
+title: "Debugging OpenNMS"
+date: 2019-01-20T13:29:25+01:00
+tags: ["debug", "development"]
+draft: true
+featured_image: ""
+---
+
+Sometimes it is required to debug against a running OpenNMS, or debug a test.
+No matter what I debug, when it comes to OpenNMS I (almost) always use Java Remote Debugging.
+This allows a Remote Debugger (e.g. eclipse or IntelliJ) to connect to the running Java application and debug the application.
+
+Before you can debug OpenNMS you need to load the project into your IDE.
+As I am using IntelliJ, this is what I am going to cover in this article.
+See link:https://wiki.opennms.org/wiki/IDEA_and_OpenNMS[IDEA and OpenNMS].
+
+1. Set a breakpoint in the IDE.
+2. Setup "Remote Debugging" for your IDE (see below for IntelliJ example)
+3. Run the application in remote debug mode
+4. Connect the Debugger
+
+## Breakpoints
+
+## Setup Remote Debugger
+
+
+## Run the Application in Remote Debug Mode
+
+For OpenNMS this is pretty straight forward: `$OPENNMS_HOME/bin/opennms -t start`.
+This will open a port on 8001 for a remote debugger to connect to.
+
+When debuggin tests, you have to run the test and tell maven to open a debugger port.
+For smoke-tests this looks something like this: `mvn clean verify -DskipITs=false -Dit.test=<testName> -Dmaven.failsafe.debug`
+For integration/unit-tests this looks like this: `mvn clean test -Dtest=<testName> -Dmaven.surefire.debug`
+In both cases mvn opens a port on 5005 to connect the remote debugger to.
+
+# Connect the Debugger
+Usually hit the "Run" button for the "Remote Debugger Configuration" from your IDE. 
+See chapter "Setup Remote Debugger".
+
+

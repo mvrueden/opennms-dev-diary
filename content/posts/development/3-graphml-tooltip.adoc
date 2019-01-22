@@ -1,0 +1,38 @@
+---
+title: "Dynamic GraphML Tooltips"
+date: 2019-01-22T13:00:00+01:00
+tags: ["topology", "graphml", "development"]
+draft: true
+featured_image: "/posts/development/custom-graphml-topology.png"
+---
+
+One user in the community is using the GraphML Topology and asked me in chat if it were possible to add tooltips to a vertex from within a groovy script.
+Short answer: Yes
+
+Long answer:
+
+By default, setting the tooltip is supposed to work only by setting it directly in the graphml file itself.
+The link:https://docs.opennms.org/opennms/branches/develop/guide-development/guide-development.html#_supported_attributes[official documentation] for this says, that the name of the attribute is `tooltipText`. 
+So if you are looking for static tooltips, that is the way to go.
+
+By default dynamic tooltips are not supported, but we could leverage the `GraphMLVertexStatusProvider` capabilities.
+Simply enable it and add the following line to the file `$OPENNMS_HOME/etc/graphml-vertex-status/default.groovy`:
+
+{{<highlight groovy>}}
+import org.opennms.features.topology.plugins.topo.graphml.GraphMLVertexStatus
+
+assert alarmSummary != null
+
+vertex.setTooltipText("test"); // :)
+
+return new GraphMLVertexStatus() \
+    .severity(alarmSummary.maxSeverity)
+    .alarmCount(alarmSummary.alarmCount)
+{{</highlight>}}
+
+That is pretty much it.
+
+For more properties, simply have a look at the classes 
+link:https://github.com/opennms/opennms/blob/develop/features/topology-map/plugins/org.opennms.features.topology.plugins.topo.graphml/src/main/java/org/opennms/features/topology/plugins/topo/graphml/GraphMLVertex.java[GraphMLVertex]
+and link:https://github.com/opennms/opennms/blob/develop/features/topology-map/org.opennms.features.topology.api/src/main/java/org/opennms/features/topology/api/topo/AbstractVertex.java[AbstractVertex].
+Any `public` method can be used in the groovy script.

@@ -1,0 +1,23 @@
+---
+title: "Shortcuts when making changes"
+date: 2019-01-20T13:29:25+01:00
+tags: ["development"]
+draft: true
+featured_image: ""
+---
+
+Web-development
+odev, rsync
+
+Osgi-Bundle
+
+bundle:watch *
+ln -s /root/.m2/repository ~/.m2/repository
+mvn clean install in module
+
+Lib-Bundle
+mvn clean install
+manually copy
+
+Or 
+Assemble.pl aufrufen

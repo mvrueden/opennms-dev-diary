@@ -1,0 +1,64 @@
+---
+title: "Run and Debug single unit and integration test"
+date: 2019-01-20T13:29:25+01:00
+tags: ["tests", "development"]
+draft: true
+featured_image: ""
+---
+
+While developing in OpenNMS at some point our Continous Integration System Bamboo (TODO MVR add link) will build and test the commited code.
+Usually that results in Test failures.
+So how to debug those tests locally?
+
+First of all, the current branch must be fully build.
+`time (./clean.pl && ./compile.pl -U -DskipTests && ./assemble.pl -p dir -DskipTests); say "OpenNMS may be ready for deployment"` (TODO MVR link to How to Compile)
+
+<small>This is a bit tedious, but do not try any shortcuts here, especially if you are switching branches a lot, or do not know what you are doing.</small>
+
+Bamboo will usually tell which test class or test method failed.
+TODO MVR add screenshot from failing Bamboo
+
+Now we have to find the module wher ethis class lives in.
+I usually do that by finding it:
+
+`find ~/dev/opennms -iname "<testName>.java"`
+
+Afterwards navigate to the module:
+
+`cd ~/dev/opennms/<module>`
+
+Now we have to distinguish if it is a unit or integration test.
+A unit test ends with `Test.java`, whereas an integration test ends with `IT.java`.
+
+## Unit Test
+
+Running a Unit-Test:
+
+`mvn clean test -Dtest=<testName>`
+
+Debugging a Unit Test
+
+`mvn clean test -Dtest=<testName> -Dmaven.surefire.debug` 
+
+This will open a maven remote debugger on Port 5005.
+With your IDE of choice you can now remote connect to that port and start debugging.
+TODO MVR add link to article
+More details see TODO link von open
+
+## Integratin Test
+
+Running an Integration-Test:
+
+`mvn clean verify -DskipITs=false -Dit.test=<testName>
+
+Debuggin an Integration-Test:
+
+`mvn clean verify -DskipITs=false -Dit.test=<testName> -Dmaven.failsafe
+
+When running Integration tests (via the `mvn verify` goal) all unit tests are also executed.
+This is especially frustrated, when the unit tests take some time as well as the integration test.
+To increase roundtrip time, I tend to just delete the unit tests and fix any potential compile errors.
+When the test is fixed, I simply revert the changes using `git checkout -p` or `git checkout -- <file name>`
+
+`find . -iname "*Test.java" -exec rm -f {} \;`
+

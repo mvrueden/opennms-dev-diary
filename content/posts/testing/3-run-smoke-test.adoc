@@ -1,0 +1,19 @@
+---
+title: "Run and Debug smoke tests"
+date: 2019-01-20T13:29:25+01:00
+tags: ["tests", "development"]
+draft: true
+featured_image: ""
+---
+
+Sometimes it is required to run a smoke test locally.
+A smoke test in OpenNMS is a test running against an actual (not configured, fresh installed) instance of OpenNMS, doing some ui tests.
+
+In order to run a smoke test you either need to build OpenNMS, freshly install it from RPMs or use the OpenNMS smoke-test docker image.
+
+
+Smoke Test are tests, running ui tests, e.g. <testname>
+
+Either fully build manually, start OpenNMS and run the test
+
+Or build docker images (TODO add my script) and start it, then run the test
