@@ -7,9 +7,10 @@ featured_image: "/posts/development/custom-graphml-topology.png"
 ---
 
 One user in the community is using the GraphML Topology and asked me in chat if it were possible to add tooltips to a vertex from within a groovy script.
+
 Short answer: Yes
 
-Long answer:
+## Long answer
 
 By default, setting the tooltip is supposed to work only by setting it directly in the graphml file itself.
 The link:https://docs.opennms.org/opennms/branches/develop/guide-development/guide-development.html#_supported_attributes[official documentation] for this says, that the name of the attribute is `tooltipText`. 
