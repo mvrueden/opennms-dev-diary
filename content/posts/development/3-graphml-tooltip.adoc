@@ -2,7 +2,7 @@
 title: "Dynamic GraphML Tooltips"
 date: 2019-01-22T13:00:00+01:00
 tags: ["topology", "graphml", "development"]
-draft: true
+draft: false
 featured_image: "/posts/development/custom-graphml-topology.png"
 ---
 
