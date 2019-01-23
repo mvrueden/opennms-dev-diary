@@ -1,0 +1,52 @@
+---
+title: "Connecting to the Karaf Shell"
+date: 2019-01-23T13:00:00+01:00
+tags: ["karaf", "osgi", "development"]
+draft: false
+featured_image: "/posts/development/opennms-karaf-shell-welcome.png"
+---
+
+OpenNMS uses link:https://karaf.apache.org[Apache Karaf] under the hood and in some cases (especially during development) it is required to connect to the OpenNMS Karaf Shell.
+
+First of all OpenNMS must be started to connect to the Karaf Shell.
+I usually start OpenNMS with the `-v (verbose)` and `-t (debug)` options:
+
+```
+$OPENNMS_HOME/bin/opennms -vt start
+```
+
+Afterwards I check with 
+
+```
+$OPENNMS_HOME/bin/opennms -v status
+```
+
+until the `Jetty Webserver` is `STARTED`, as the Karaf Container is started by the Webapp itself.
+
+Usually you would connect to the shell via 
+
+```
+ssh admin@localhost -p 8101 (the password is `admin` as well)
+```
+
+However you most like will get the following error message or something similar 
+
+```
+Unable to negotiate with ::1: no matching host key type found. Their offer: ssh-dss
+```
+
+To work around this issue you can connect like this: `ssh admin@localhost -p 8101 -oHostKeyAlgorithms=+ssh-dss`.
+
+If you got around this, in most cases you will get asked if you want to connect to the unknown host.
+However, if you hit yes, the next time you connect to the shell, but have rebuilt OpenNMS connection is refused (due to changed host key).
+So you manually have to remove the entry from `~/.ssh/known_hosts`.
+
+Both adding the host key algorithm and deleting the entry from known_hosts is tidious. 
+Therfore my `~/.ssh/config` contains the following entry:
+
+```
+Host localhost
+     HostKeyAlgorithms +ssh-dss
+     StrictHostKeyChecking no
+     UserKnownHostsFile=/dev/null
+```
