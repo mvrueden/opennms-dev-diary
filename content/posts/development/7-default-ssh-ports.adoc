@@ -1,0 +1,19 @@
+---
+title: "Default SSH Ports"
+date: 2019-01-26T08:00:00+01:00
+tags: ["karaf", "osgi", "development"]
+draft: false
+featured_image: ""
+---
+
+link:/posts/development/4-connect-to-karaf-shell[Here] I explained on how to connect to the OpenNMS Karaf Shell.
+However when connecting to Sentinel or Minion the ports are different.
+
+The following table shows the default ports for each system
+
+|=======
+|System     | Port
+|OpenNMS    | 8101
+|Minion     | 8201
+|Sentinel   | 8301 
+|=======

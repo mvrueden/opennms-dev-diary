@@ -1,0 +1,39 @@
+---
+title: "Show config from Karaf Shell"
+date: 2019-01-26T09:00:00+01:00
+tags: ["karaf", "osgi", "development"]
+draft: false
+featured_image: ""
+---
+
+Sometimes it is required to show a (bundle) configuration from the Karaf Shell.
+This may be on OpenNMS, Minion or Sentinel.
+
+First of all a connection to the Karaf Shell must be made.
+link:/posts/development/4-connect-to-karaf-shell[Here] is described on how to do this.
+The according ports can be found link:/posts/development/7-default-ssh-ports[here].
+
+Now let's assume we want to see the current values of the id, location and other settings on Minion.
+First of all we need to know in which cfg file the property is located.
+
+For this
+
+```
+config:list
+```
+
+prints all configuration files with its configuration properties.
+
+To filter for one config file, the following will do:
+
+```
+config:list "(service.pid=<config-pid>)"
+```
+
+So to show the config file for Minion id, location and such, the following command will do that for you
+
+```
+config:list "(service.pid=org.opennms.minion.controller)"
+```
+
+Please note, that this will only show actual configuration and no default values.
