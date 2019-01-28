@@ -1,0 +1,144 @@
+---
+title: "Hibernate - Using multiple relations using @Where does not update properly"
+date: 2019-01-28T14:30:00+01:00
+tags: ["hibernate", "graph", "development"]
+draft: false
+featured_image: "https://get.pxhere.com/photo/military-army-red-flame-fire-weapon-bonfire-explosion-war-danger-disaster-lava-terror-destruction-bomb-atomic-apocalypse-radioactive-warfare-nuclear-hydrogen-radiation-catastrophe-bombing-armageddon-geological-phenomenon-nuke-1285422.jpg"
+---
+
+While working on the persistence for the new graph service I encountered a weird behaviour:
+Each time a persisted graph is altered the edges were removed.
+So I investigated and it turns out if you are using hibernate inheritance in combination with the `@Where` clause hibernate only persists the entities which have been modified and removes the relation to the others, but keeps the entities *sigh*.
+
+
+For more clarity, here is the original code
+
+{{<highlight java>}}
+@Entity
+@DiscriminatorValue("graph")
+public class GraphEntity extends AbstractGraphEntity {
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinTable(name = "graph_element_relations",
+            joinColumns = { @JoinColumn(name = "parent_id", referencedColumnName = "id", nullable = false, updatable = false) },
+            inverseJoinColumns = { @JoinColumn(name="child_id", referencedColumnName = "id", nullable = false, updatable = false) }
+    )
+    @Where(clause="TYPE='vertex'")
+    @BatchSize(size=1000)
+    private List<VertexEntity> vertices = new ArrayList<>();
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinTable(name = "graph_element_relations",
+            joinColumns = { @JoinColumn(name = "parent_id", referencedColumnName = "id", nullable = false, updatable = false) },
+            inverseJoinColumns = { @JoinColumn(name="child_id", referencedColumnName = "id", nullable = false, updatable = false) }
+    )
+    @Where(clause="TYPE='edge'")
+    @BatchSize(size=1000)
+    private List<EdgeEntity> edges = new ArrayList<>();
+
+    public List<EdgeEntity> getEdges() {
+        return edges;
+    }
+
+    public List<VertexEntity> getVertices() {
+        return vertices;
+    }
+}
+{{</highlight>}}
+
+Let's assume the graph has 2 vertices and 1 edge. 
+When persisting it via `genericPersistenceAccessor.save(graph)` the data is stored correctly into the database.
+
+Now let's update the graph by adding a new vertex in a new session.
+
+{{<highlight java>}}
+GraphContainerEntity container = genericPersistenceAccessor.get(GraphContainerEntity.class, 1L /* some id */)
+GraphEntity graph = container.getGraph("namespace"); // get it from the container
+
+// New Vertex
+VertexEntity newVertex = new VertexEntity();
+newVertex.setNamespace(graph.getNamespace());
+newVertex.setProperty(GenericProperties.ID, String.class, "v3");
+newVertex.setProperty(GenericProperties.LABEL, String.class, "New Vertex");
+
+// Add it to the graph
+graph.getVertices().add(newVertex);
+
+// Update
+genericPersistenceAccessor.update(container);
+{{</highlight>}}
+
+Afterwads we verify the data beeing written (again new session).
+
+{{<highlight java>}}
+// loading the container and verifying the graph
+GraphContainerEntity container = genericPersistenceAccessor.get(GraphContainerEntity.class, 1L /* some id */)
+GraphEntity graph = container.getGraph("namespace"); // get it from the container
+graph.getVertices().size(); // 3. So far so good
+graph.getEdges().size(); // 0. Wait what?
+{{</highlight>}}
+
+This does not look so successful. 
+So let`s verify the data via reading each entity manually.
+
+{{<highlight java>}}
+persistenceAccessor.find("Select g from GraphContainerEntity g"); // result 1
+persistenceAccessor.find("Select g from GraphEntity g"); // result 1
+persistenceAccessor.find("Select v from VertexEntity v"); // result 3.
+persistenceAccessor.find("Select e from EdgeEntity e"; // result 2.
+{{</highlight>}}
+
+So it seems that while persisting the data using the `@Where` clause from above, the data is updated correctly, but somehow the relation is lost.
+
+I worked around this by changing the code to just use one `relations` attribute and "extract" the according relations from it.
+We implemented something similar in the link:https://github.com/opennms/opennms/blob/develop/features/bsm/persistence/api/src/main/java/org/opennms/netmgt/bsm/persistence/api/BusinessServiceEntity.java[BusinessServiceEntity].
+
+{{<highlight java>}}
+@Entity
+@DiscriminatorValue("graph")
+public class GraphEntity extends AbstractGraphEntity {
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinTable(name = "graph_element_relations",
+            joinColumns = { @JoinColumn(name = "parent_id", referencedColumnName = "id", nullable = false, updatable = true) },
+            inverseJoinColumns = { @JoinColumn(name="child_id", referencedColumnName = "id", nullable = false, updatable = true) }
+    )
+    @BatchSize(size=1000)
+    private List<AbstractGraphEntity> relations = new ArrayList<>();
+
+    public List<EdgeEntity> getEdges() {
+        return getElements(EdgeEntity.class);
+    }
+
+    public List<VertexEntity> getVertices() {
+        return getElements(VertexEntity.class);
+    }
+
+    public <T extends AbstractGraphEntity> void addRelations(List<T> relations) {
+        relations.addAll(relations);
+    }
+
+    public void addVertex(VertexEntity vertexEntity) {
+        relations.add(vertexEntity);
+    }
+
+    public void addEdge(EdgeEntity edgeEntity) {
+        relations.add(edgeEntity);
+    }
+
+    @Transient
+    @SuppressWarnings("unchecked")
+    private <T extends AbstractGraphEntity> List<T> getElements(Class<T> type) {
+        return Collections.unmodifiableList(relations.stream()
+                .filter(type::isInstance)
+                .map(e -> (T)e)
+                .collect(Collectors.toList()));
+    }
+}
+{{</highlight>}}
+
+This is not as elegant, but at least it works.
+Maybe I can revisit this and make it more elegant.
+
+Good thing there was a test for this, otherwise I would never have found it while working on it.
+Or at least not this early in development.
