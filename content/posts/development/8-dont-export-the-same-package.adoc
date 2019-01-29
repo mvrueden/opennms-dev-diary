@@ -1,0 +1,146 @@
+---
+title: "Don't export the same package as another bundle"
+date: 2019-01-29T15:30:00+01:00
+tags: ["karaf", "osgi", "development"]
+draft: false
+featured_image: "https://images.pexels.com/photos/280076/pexels-photo-280076.jpeg?auto=compress"
+---
+
+Today I wanted to wire in the new `GraphService` into OpenNMS and have a `graph:list` command show a GraphML graph I sent to the `/opennms/rest/graphml` endpoint.
+The idea was to leverage the `GraphmlRepository` to also store a configuration file for a new `GraphMLGraphContainerProviderServiceFactory` implementing a `ManagedServiceFactory`.
+Basically the same as we already do with the link:https://github.com/opennms/opennms/blob/develop/features/topology-map/plugins/org.opennms.features.topology.plugins.topo.graphml/src/main/java/org/opennms/features/topology/plugins/topo/graphml/internal/GraphMLMetaTopologyFactory.java[GraphMLTopologyFactory]
+
+I wired everything together and was also able to install the features. 
+However as soon as I send the graphml document to the rest endpoint via (of course OpenNMS should be started)
+
+```
+cd ~/dev/opennms/smoke-test
+# Ensure it is not already existing
+curl -v -X DELETE -u admin:admin http://localhost:8980/opennms/rest/graphml/test-graph
+# wait a few seconds, then create the graph
+curl -v -X POST -u admin:admin -H "Content-Type: application/xml" -d@src/test/resources/topology/graphml/test-topology.xml http://localhost:8980/opennms/rest/graphml/test-graph
+```
+
+In the karaf.log the following exception occurs *sigh*:
+
+```
+
+java.lang.NoClassDefFoundError: edu/uci/ics/jung/graph/DirectedSparseGraph
+	at org.opennms.features.graph.api.AbstractGraph.<init>(AbstractGraph.java:50) ~[?:?]
+	at org.opennms.features.graph.api.generic.GenericGraph.<init>(GenericGraph.java:74) ~[?:?]
+	at org.opennms.features.graph.providers.graphml.GraphmlGraphContainerProvider.convert(GraphmlGraphContainerProvider.java:136) ~[?:?]
+	at org.opennms.features.graph.providers.graphml.GraphmlGraphContainerProvider.loadGraphContainer(GraphmlGraphContainerProvider.java:117) ~[?:?]
+	at org.opennms.features.graph.providers.graphml.GraphmlGraphContainerProvider.<init>(GraphmlGraphContainerProvider.java:87) ~[?:?]
+	at org.opennms.features.graph.providers.graphml.GraphMLContainerProviderServiceFactory.updated(GraphMLContainerProviderServiceFactory.java:79) ~[?:?]
+	at org.apache.felix.cm.impl.helper.ManagedServiceFactoryTracker.updated(ManagedServiceFactoryTracker.java:159) ~[8:org.apache.felix.configadmin:1.8.16]
+	at org.apache.felix.cm.impl.helper.ManagedServiceFactoryTracker.provideConfiguration(ManagedServiceFactoryTracker.java:93) [8:org.apache.felix.configadmin:1.8.16]
+	at org.apache.felix.cm.impl.ConfigurationManager$UpdateConfiguration.run(ConfigurationManager.java:1792) [8:org.apache.felix.configadmin:1.8.16]
+	at org.apache.felix.cm.impl.UpdateThread.run0(UpdateThread.java:141) [8:org.apache.felix.configadmin:1.8.16]
+	at org.apache.felix.cm.impl.UpdateThread.run(UpdateThread.java:109) [8:org.apache.felix.configadmin:1.8.16]
+	at java.lang.Thread.run(Thread.java:748) [?:?]
+```
+
+That is weird, so investigating the bundle via `headers:<bundle id>` showed that the package `edu.uci.ics.jung.graph` is actually not imported.
+Okay, fine, that is easy to fix, simply adding a customized `Import-Package` statement to the related pom, to see if this will fix it.
+
+```
+<Import-Package>*,edu.uci.ics.jung.graph</Import-Package>
+```
+
+`bundle:watch` and `mvn clean install` and re-importing the graph, still resulted in a `NoClassDefFoundError`.
+
+`(╯°□°）╯︵ ┻━┻`
+
+Let's try some debug magic.
+Hitting the breakpoint at `GraphmlGraphContainerProvider.java:136` and trying to load the classes from the `Evaluate Expression Dialog` (IntelliJ)
+
+```
+Class.forName("edu.uci.ics.jung.graph.DirectedSparseGraph"); // NoClassDefFoundError. Okay that was expected.
+Class.forName("edu.uci.ics.jung.graph.SparseGraph"); // Works. Hmm... wait, what?
+```
+
+So the last is working, but has the same package, so why is that working, but not the `DirectedSparseGraph`?
+Looking where the classes are coming from, it turns out they are from different maven modules, but share the same package.
+Usually I would simply change the packages, but unfortunately they are 3rd party dependencies, so this does not work.
+To solve this, we have to get shady and put the dependencies in one big jar using the maven-shade-plugin *sigh*
+
+The pom for this looks like this (simplified)
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.opennms.features</groupId>
+        <artifactId>org.opennms.features.graphs</artifactId>
+        <version>24.0.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- Feature Definition -->
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.opennms.features.graphs</groupId>
+    <artifactId>org.opennms.features.graphs.jung</artifactId>
+    <version>${jungVersion}</version>
+    <description>shaded osgi bundle containing complete jung implementation</description>
+    <packaging>bundle</packaging>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>2.4.3</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <artifactSet>
+                            </artifactSet>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <extensions>true</extensions>
+                <configuration>
+                    <instructions>
+                        <Export-Package>edu.uci.ics.jung.graph;version="${jungVersion}",edu.uci.ics.jung.graph.util;version="${jungVersion}"</Export-Package>
+                    </instructions>
+                    <unpackBundle>true</unpackBundle>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    <dependencies>
+        <dependency>
+            <groupId>net.sf.jung</groupId>
+            <artifactId>jung-api</artifactId>
+            <version>${jungVersion}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.sf.jung</groupId>
+            <artifactId>jung-graph-impl</artifactId>
+            <version>${jungVersion}</version>
+        </dependency>
+    </dependencies>
+</project>
+```
+
+Rebuilding and running the same commands from above, it finally "worked" \o/
+So what did we learn?
+
+### One should not simply export the same packages in different modules when it comes to OSGI
+
+`┬─┬ ノ( ゜-゜ノ)`
+
+### Side note
+
+I was always wondering why the Topology Map is embedding the jung dependencies: link:https://github.com/opennms/opennms/blob/ee18a55778a8f73eb9ec4182e3e9e9447593d7ca/features/topology-map/org.opennms.features.topology.app/osgi.bnd#L9-L10[click].
+This is probably why.
+
+### Disclaimer
+
+By "it finally worked" I mean another Exception was thrown which is probably explained in the next post (-:
