@@ -40,6 +40,7 @@ Mainly I followed the official link:https://getbootstrap.com/docs/4.0/migration/
 In order to not miss anything, a link:https://docs.google.com/spreadsheets/d/18cxvSMEBI4LDTTzmrFA_7CCRtSH-OOWoYV_4QCsDk2s[Google Sheet] helped to track the progress.
 
 Besides that the following problems had to be solved:
+
  * Glyphicons are no longer part of bootstrap. Therefore the support was dropped and now only font-awesome Icons are available.
  * Validation is rewritten, as `has-errors` is no longer available, but `is-invalid` is. Also some inputs are no longer showing visuals, but are replaced with a more unique concept.
 
