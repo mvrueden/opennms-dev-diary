@@ -12,3 +12,4 @@ Paginate = 10
   description = "The last theme you'll ever need. Maybe."
   featured_image = "/images/featured-ulf.jpg"
   recent_posts_number = 5
+   custom_css = ["css/font-awesome.min.css"]
