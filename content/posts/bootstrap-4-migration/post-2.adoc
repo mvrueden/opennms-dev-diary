@@ -3,7 +3,7 @@ title: "Bootstrap 4 Finetuning"
 date: 2019-02-13T14:00:00+01:00
 tags: ["refactoring", "bootstrap"]
 draft: false
-featured_image: "https://cdn.pixabay.com/photo/2014/04/05/11/39/bonsai-316573_960_720.jpg"
+featured_image: "https://images.pexels.com/photos/270404/pexels-photo-270404.jpeg?auto=compress&cs=tinysrgb&h=750&w=1260"
 ---
 
 The Bootstrap 4 Migration is about to be finalized.
