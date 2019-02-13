@@ -1,0 +1,35 @@
+---
+title: "Bootstrap 4 Finetuning"
+date: 2019-02-13T14:00:00+01:00
+tags: ["refactoring", "bootstrap"]
+draft: false
+featured_image: "https://pixabay.com/get/ea34b70a2ff71c22d2524518a33219c8b66ae3d01cb1114793f6c370/bonsai-316573_1280.jpg"
+---
+
+The Bootstrap 4 Migration is about to be finalized.
+When we showed the work to the community (and also around internally) the feedback was mostly positive.
+Some pages did not render properly, but besides that the most commonly reported issues were:
+ 
+- Card Headers use up too much space
+- Elements use up too much space in general
+- Concerns about the blue as this is supposed to be reserved for OpenNMS Meridian
+
+While the first two issues were very easy to fix, the last one took some thinking.
+Afterwards I worked with Jessica to get the last bits sorted out.
+The result of this was that too much branding is not needed at this moment.
+We settled on a darker blue version (mostly for links), made the card headers bigger and highlighted the header backgrounds more.
+
+Also we reworked the headers.
+
+This is how it looks now:
+
+.Notifications On
+image::https://user-images.githubusercontent.com/4202259/52657555-37d5be80-2ef9-11e9-8f22-0a07a51bae90.png[Header Notifications On]
+
+
+.Notifications Off
+image::https://user-images.githubusercontent.com/4202259/52657558-37d5be80-2ef9-11e9-93e1-2182a515bf2c.png[Header with Notifications Off]
+
+
+.Start Page
+image::https://user-images.githubusercontent.com/4202259/52657644-69e72080-2ef9-11e9-86e7-b510491c9773.png[Start Page]
