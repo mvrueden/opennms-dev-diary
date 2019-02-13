@@ -1,0 +1,577 @@
+---
+title: "Upgrading Karaf to 4.2.2"
+date: 2019-02-13T17:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: "https://images.pexels.com/photos/266403/pexels-photo-266403.jpeg?auto=compress&cs=tinysrgb&h=750&w=1260"
+---
+:icons: font
+
+We are attempting to get OpenNMS to run on Java 9 icon:share-square-o[link="https://issues.opennms.org/browse/NMS-10539", window="_blank"].
+The first step of this is to make it compile for Java 9, which we are working on actively icon:share-square-o[link="https://issues.opennms.org/browse/HZN-1078", window="_blank"].
+However making it run/compile on Java 9 requires a lot of dependencies to be upgrades as they are not Java 9 compatible as well.
+One of those dependency upgrades is to upgrade Apache Karaf to version 4.2.2, as you can see in the following figure.
+
+.Karaf Version Overview
+image::/posts/development/karaf-version-overview.jpeg[Karaf Version Overview]
+
+Ben did already some work on that, but when starting OpenNMS the following exception appears in the karaf.log.
+
+```
+org.osgi.framework.ServiceException: Service factory exception: org.eclipse.jetty.websocket.api.extensions.Extension: Provider org.eclipse.jetty.websocket.common.extensions.identity.IdentityExtension not a subtype
+     at org.apache.felix.framework.ServiceRegistrationImpl.getFactoryUnchecked(ServiceRegistrationImpl.java:352) ~[?:?]
+     at org.apache.felix.framework.ServiceRegistrationImpl.getService(ServiceRegistrationImpl.java:247) ~[?:?]
+     at org.apache.felix.framework.ServiceRegistry.getService(ServiceRegistry.java:350) ~[?:?]
+     at org.apache.felix.framework.Felix.getService(Felix.java:3737) ~[?:?]
+     at org.apache.felix.framework.BundleContextImpl.getService(BundleContextImpl.java:470) ~[?:?]
+     at com.eclipsesource.jaxrs.publisher.internal.ResourceTracker.addingService(ResourceTracker.java:42) ~[?:?]
+     at org.osgi.util.tracker.ServiceTracker$Tracked.customizerAdding(ServiceTracker.java:941) ~[?:?]
+     at org.osgi.util.tracker.ServiceTracker$Tracked.customizerAdding(ServiceTracker.java:870) ~[?:?]
+     at org.osgi.util.tracker.AbstractTracked.trackAdding(AbstractTracked.java:256) ~[?:?]
+     at org.osgi.util.tracker.AbstractTracked.trackInitial(AbstractTracked.java:183) ~[?:?]
+     at org.osgi.util.tracker.ServiceTracker.open(ServiceTracker.java:318) ~[?:?]
+     at org.osgi.util.tracker.ServiceTracker.open(ServiceTracker.java:261) ~[?:?]
+     at com.eclipsesource.jaxrs.publisher.internal.Activator.openAllServiceTracker(Activator.java:91) ~[?:?]
+     at com.eclipsesource.jaxrs.publisher.internal.Activator.start(Activator.java:55) ~[?:?]
+     at org.apache.felix.framework.util.SecureAction.startActivator(SecureAction.java:697) ~[?:?]
+     at org.apache.felix.framework.Felix.activateBundle(Felix.java:2240) ~[?:?]
+     at org.apache.felix.framework.Felix.startBundle(Felix.java:2146) ~[?:?]
+     at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:998) ~[?:?]
+     at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:984) ~[?:?]
+     at org.apache.karaf.features.internal.service.BundleInstallSupportImpl.startBundle(BundleInstallSupportImpl.java:161) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.startBundle(FeaturesServiceImpl.java:1116) ~[?:?]
+     at org.apache.karaf.features.internal.service.Deployer.deploy(Deployer.java:997) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.doProvision(FeaturesServiceImpl.java:1025) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.lambda$doProvisionInThread$13(FeaturesServiceImpl.java:964) ~[?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) ~[?:?]
+     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) ~[?:?]
+     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) ~[?:?]
+     at java.lang.Thread.run(Thread.java:748) [?:?]
+```
+
+Looking at the `ResourceTracker.addingService` method in link:https://github.com/OpenNMS/osgi-jax-rs-connector/blob/f7358224b442412be17abf76add6aa51c681eade/connector/com.eclipsesource.jaxrs.publisher/src/main/java/com/eclipsesource/jaxrs/publisher/internal/ResourceTracker.java#L42[line 42] it tries to resolve the service, but fails.
+
+```
+@Override
+  public Object addingService( ServiceReference reference ) {
+    Object service = context.getService( reference );
+    return delegateAddService( reference, service );
+  }
+```
+
+Debugging into the line, the service, which cannot be resolved is the link:https://github.com/eclipse/jetty.project/blob/jetty-9.2.x/jetty-websocket/websocket-server/src/main/java/org/eclipse/jetty/websocket/server/WebSocketServerFactory.java[WebSocketServerFactory] which must implement link:https://github.com/eclipse/jetty.project/blob/jetty-9.2.x/jetty-websocket/websocket-servlet/src/main/java/org/eclipse/jetty/websocket/servlet/WebSocketServletFactory.java[WebSocketServletFactory]. 
+
+As one can see it clearly implements the interface.
+In addition the class is no `@Provider` or `@Path` so the exception is not really a problem for exposing rest services via OSGi.
+However it should not occurr and the reason for it must be investigated icon:search[].
+
+I cannot fully recall why, but I then decided to check for a difference between the jetty version in the current working `jira/NMS-10539` branch and the latest `develop` branch.
+And it turns out, that the jetty versions differ: `9.2.19.v20160908 (jira/NMS-10539)` vs `9.4.14.v20181114 (develop)`.
+So first I merged `origin/develop` back into the working branch `jira/NMS-10539` and recompiled to see if that solves the problem.
+
+icon:frown-o[] It did not. Same exception.
+
+Just to be sure, I rechecked that the `WebSocketServerFactory` is implementing the `WebSocketServletFactory` in both versions simply on the link:https://github.com/eclipse/jetty.project[official jetty repository]. Same as already mentioned above.
+
+icon:check[] Yep it does. 
+
+That is weird, so veryfiing that the system and lib directory only contain one version showed, that jar files of both jetty versions were present.
+
+```
+
+./system/org/eclipse/jetty/jetty-jaspi/9.2.19.v20160908/jetty-jaspi-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-jaspi/9.4.12.v20180830/jetty-jaspi-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-security/9.2.19.v20160908/jetty-security-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-security/9.4.12.v20180830/jetty-security-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-util/9.2.19.v20160908/jetty-util-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-util/9.4.12.v20180830/jetty-util-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-continuation/9.2.19.v20160908/jetty-continuation-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-continuation/9.4.12.v20180830/jetty-continuation-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-deploy/9.4.12.v20180830/jetty-deploy-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-xml/9.2.19.v20160908/jetty-xml-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-xml/9.4.12.v20180830/jetty-xml-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/aggregate/jetty-all-server/8.1.14.v20131031/jetty-all-server-8.1.14.v20131031.jar
+./system/org/eclipse/jetty/jetty-webapp/9.2.19.v20160908/jetty-webapp-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-webapp/9.4.12.v20180830/jetty-webapp-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-server/9.2.19.v20160908/jetty-server-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-server/9.4.12.v20180830/jetty-server-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-jmx/9.2.19.v20160908/jetty-jmx-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-jmx/9.4.12.v20180830/jetty-jmx-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-servlets/9.2.19.v20160908/jetty-servlets-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-servlets/9.4.12.v20180830/jetty-servlets-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-jndi/9.2.19.v20160908/jetty-jndi-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-jndi/9.4.12.v20180830/jetty-jndi-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-servlet/9.2.19.v20160908/jetty-servlet-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-servlet/9.4.12.v20180830/jetty-servlet-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-rewrite/9.2.19.v20160908/jetty-rewrite-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-rewrite/9.4.12.v20180830/jetty-rewrite-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-io/9.2.19.v20160908/jetty-io-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-io/9.4.12.v20180830/jetty-io-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-http/9.2.19.v20160908/jetty-http-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-http/9.4.12.v20180830/jetty-http-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-jaas/9.2.19.v20160908/jetty-jaas-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-jaas/9.4.12.v20180830/jetty-jaas-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-util-ajax/9.2.19.v20160908/jetty-util-ajax-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-util-ajax/9.4.12.v20180830/jetty-util-ajax-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-plus/9.2.19.v20160908/jetty-plus-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-plus/9.4.12.v20180830/jetty-plus-9.4.12.v20180830.jar
+./system/org/eclipse/jetty/jetty-client/9.2.19.v20160908/jetty-client-9.2.19.v20160908.jar
+./system/org/eclipse/jetty/jetty-client/9.4.12.v20180830/jetty-client-9.4.12.v20180830.jar
+./system/org/ops4j/pax/web/pax-web-jetty/4.3.0/pax-web-jetty-4.3.0.jar
+./system/org/ops4j/pax/web/pax-web-jetty/7.2.5/pax-web-jetty-7.2.5.jar
+./lib/jetty-webapp-9.4.14.v20181114.jar
+./lib/jetty-jmx-9.4.14.v20181114.jar
+./lib/jetty-annotations-9.4.14.v20181114.jar
+./lib/jetty-io-9.4.14.v20181114.jar
+./lib/jetty-util-9.4.14.v20181114.jar
+./lib/jetty-server-9.4.14.v20181114.jar
+./lib/jetty-jndi-9.4.14.v20181114.jar
+./lib/jetty-plus-9.4.14.v20181114.jar
+./lib/jetty-servlet-9.4.14.v20181114.jar
+./lib/opennms-jetty-24.0.0-SNAPSHOT.jar
+./lib/jetty-xml-9.4.14.v20181114.jar
+./lib/jetty-client-9.4.14.v20181114.jar
+./lib/jetty-rewrite-9.4.14.v20181114.jar
+./lib/jetty-deploy-9.4.14.v20181114.jar
+./lib/jetty-http-9.4.14.v20181114.jar
+./lib/jetty-schemas-3.1.2.jar
+./lib/jetty-security-9.4.14.v20181114.jar
+```
+
+This is odd, as the jetty version should match now, there is no need for both to be present.
+
+Playing around with karaf console, showed that there are actually multiple features present installing different jetty versions.
+That shouldn't be.
+I needed to find out, where the `9.2.19.v20160908` is leaking in from.
+
+A
+
+```
+list -t 0 | grep -i jetty
+```
+
+Didn't show me anything.
+
+However
+
+```
+features:list | grep -i jetty
+```
+
+on the other hand was much more interesting:
+
+```
+admin@opennms> feature:list | grep -i jetty
+cxf-http-jetty                           │ 3.1.11                                 │          │ Uninstalled │ cxf-3.1.11                  │
+pax-jetty                                │ 9.2.19.v20160908                       │          │ Started     │ org.ops4j.pax.web-4.3.0     │ Provide Jetty engine support
+pax-jetty-spdy                           │ 4.3.0                                  │          │ Uninstalled │ org.ops4j.pax.web-4.3.0     │ Optional additional feature to run Jetty with SPDY
+pax-http-jetty                           │ 4.3.0                                  │          │ Uninstalled │ org.ops4j.pax.web-4.3.0     │
+camel-jetty9                             │ 2.19.1                                 │          │ Uninstalled │ camel-2.19.1                │
+camel-jetty                              │ 2.19.1                                 │          │ Uninstalled │ camel-2.19.1                │
+felix-http                               │ 4.0.6                                  │          │ Uninstalled │ standard-4.2.2              │ Felix HTTP Jetty Service
+jetty                                    │ 9.4.12.v20180830                       │          │ Uninstalled │ standard-4.2.2              │
+jetty                                    │ 8.1.14.v20131031                       │          │ Uninstalled │ standard-4.2.2              │
+```
+
+You can clearly see that the feature `pax-jetty` is started, but is using version `9.2.19.v20160908`.
+
+But why is that?
+
+It was a wild guess, but I decided to take a look at the `jax-rs-connector` feature defintion icon:share-square-o[link="https://github.com/OpenNMS/osgi-jax-rs-connector/blob/master/karaf-integration/features/src/main/resources/features.xml#L3-L12", window="_blank"].
+
+```
+ <feature name="jax-rs-connector" version="${project.version}" resolver="(obr)" description="Jersey JAX RS OSGi Connector">
+        <feature>http</feature>
+        <feature>scr</feature>
+        <bundle dependency="true">mvn:javax.annotation/javax.annotation-api/1.2</bundle>
+        <bundle dependency="true">mvn:javax.servlet/javax.servlet-api/${servlet.version}</bundle>
+        <bundle dependency="true">mvn:com.eclipsesource.jaxrs/jersey-min/${jersey.version}</bundle>
+        <bundle>mvn:com.eclipsesource.jaxrs/consumer/${project.version}</bundle>
+        <bundle>mvn:com.eclipsesource.jaxrs/publisher/${project.version}</bundle>
+        <bundle>mvn:com.eclipsesource.jaxrs/publisher-api/${project.version}</bundle>
+    </feature>
+```
+
+It is installing feature `http`. Again a wild guess, but I assumed at some point it will install `pax-jetty`.
+
+Time to resolve the feature dependency tree and see what is to be found:
+
+```
+admin@opennms> feature:info http
+Feature http 4.2.2
+Description:
+  Implementation of the OSGI HTTP Service
+Feature has no configuration
+Feature has no configuration files
+Feature depends on:
+  opennms-bridge-http-service 0.0.0
+Feature has no bundles.
+Feature has no conditionals.
+```
+
+Nothing intereseting.
+
+Let's see about the `opennms-bridge-http-service`
+
+```
+admin@opennms> feature:info opennms-bridge-http-service
+Feature opennms-bridge-http-service 24.0.0.SNAPSHOT
+Description:
+  OpenNMS Bridge OSGi HTTP Service
+Feature has no configuration
+Feature has no configuration files
+Feature depends on:
+  pax-http 0.0.0
+Feature contains followed bundles:
+  mvn:org.opennms.container/org.opennms.container.bridge/24.0.0-SNAPSHOT start-level=30
+Feature contains followed conditionals:
+Conditional(webconsole) has no configuration
+Conditional(webconsole) has no configuration files
+Conditional(webconsole) has no dependencies.
+Conditional(webconsole) contains followed bundles:
+  mvn:org.apache.karaf.webconsole/org.apache.karaf.webconsole.http/4.2.2 start-level=30
+```
+
+Oh, getting closer
+Let's reveal `pax-http`.
+
+```
+admin@opennms> feature:info pax-http
+Feature pax-http 4.3.0
+Description:
+  Implementation of the OSGI HTTP Service
+Details:
+  Allows to publish servlets using pax web and jetty
+Feature has no configuration
+Feature has no configuration files
+Feature depends on:
+  pax-http-jetty [4.3,4.4)
+Feature has no bundles.
+Feature has no conditionals.
+```
+
+Oh something named `*-jetty`. Let's see what we find here
+
+```
+admin@opennms> feature:info pax-http-jetty
+Feature pax-http-jetty 4.3.0
+Feature configuration:
+  org.ops4j.pax.web
+Feature configuration files:
+  /etc/jetty.xml
+Feature depends on:
+  pax-jetty [7.0,10.0)
+Feature contains followed bundles:
+  mvn:org.ow2.asm/asm-all/5.0.2 start-level=20
+  mvn:org.apache.xbean/xbean-bundleutils/4.1 start-level=20
+  mvn:org.apache.xbean/xbean-reflect/4.1 start-level=20
+  mvn:org.apache.xbean/xbean-finder/4.1 start-level=20
+  mvn:org.ops4j.pax.web/pax-web-api/4.3.0 start-level=30
+  mvn:org.ops4j.pax.web/pax-web-spi/4.3.0 start-level=30
+  mvn:org.ops4j.pax.web/pax-web-runtime/4.3.0 start-level=30
+  mvn:org.ops4j.pax.web/pax-web-jetty/4.3.0 start-level=30
+Feature has no conditionals.
+```
+
+Hmmm.... again, let's see what is behind `pax-jetty`.
+
+```
+admin@opennms> feature:info pax-jetty
+Feature pax-jetty 9.2.19.v20160908
+Description:
+  Provide Jetty engine support
+Feature has no configuration
+Feature has no configuration files
+Feature has no dependencies.
+Feature contains followed bundles:
+  mvn:org.apache.servicemix.specs/org.apache.servicemix.specs.activation-api-1.1/2.5.0 start-level=30
+  mvn:javax.servlet/javax.servlet-api/3.1.0 start-level=30
+  mvn:javax.mail/mail/1.4.4 start-level=30
+  mvn:org.apache.geronimo.specs/geronimo-jta_1.1_spec/1.1.1 start-level=30
+  mvn:javax.annotation/javax.annotation-api/1.2 start-level=30
+  mvn:org.apache.geronimo.specs/geronimo-jaspic_1.0_spec/1.1 start-level=30
+  mvn:org.ow2.asm/asm-all/5.0.2 start-level=30
+  mvn:org.apache.aries.spifly/org.apache.aries.spifly.dynamic.bundle/1.0.1 start-level=30
+  mvn:org.apache.aries/org.apache.aries.util/1.1.0 start-level=30
+  mvn:org.eclipse.jetty/jetty-continuation/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-http/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-io/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-jaspi/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-jmx/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-jndi/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-plus/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-rewrite/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-security/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-server/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-servlet/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-servlets/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-util/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-util-ajax/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-webapp/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-jaas/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-xml/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty/jetty-client/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty.websocket/websocket-server/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty.websocket/websocket-client/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty.websocket/websocket-common/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty.websocket/websocket-servlet/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty.websocket/websocket-api/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty.websocket/javax-websocket-server-impl/9.2.19.v20160908 start-level=30
+  mvn:org.eclipse.jetty.websocket/javax-websocket-client-impl/9.2.19.v20160908 start-level=30
+  mvn:javax.websocket/javax.websocket-api/1.1 start-level=30
+Feature has no conditionals.
+admin@opennms>
+```
+
+Gotcha!
+
+Summarized, the dependency tree is as follows:
+
+```
+opennms-bridge-http-service -> pax-http -> pax-http-jetty -> pax-jetty
+```
+
+Now I was a bit stuck, as I was looking for the features in OpenNMS, but could only find `opennms-bridge-http-service`, and some other `opennms-*` related things to link:/posts/development/9-hindenburg-effect[our http bridge].
+What I noticed however is, that the bridge features are referring to a maven propety `${paxWebVersion}` and I knew that we do really nasty things to get jetty and karaf working (the way we do it).
+
+So wondering what the default version of a clean Karaf 4.2.2 container would be, revealed something interesting.
+But first, I had to download the latest Karaf 4.2.2 distribution, start it and install our `jax-rs-connector` feature.
+
+```
+karaf@root()> feature:repo-add mvn:com.eclipsesource.jaxrs/features/1.0.0-ONMS/xml/features
+karaf@root()> feature:install jax-rs-connector
+karaf@root()> feature:list | grep -i jetty
+felix-http                      │ 4.0.6                                  │          │ Uninstalled │ standard-4.2.2                    │ Felix HTTP Jetty Service
+jetty                           │ 9.4.12.v20180830                       │          │ Uninstalled │ standard-4.2.2                    │
+jetty                           │ 8.1.14.v20131031                       │          │ Uninstalled │ standard-4.2.2                    │
+pax-cdi-web-weld-jetty          │ 1.0.0                                  │          │ Uninstalled │ org.ops4j.pax.cdi-1.0.0           │ Weld Web CDI / Jetty support
+pax-jetty                       │ 9.4.12.v20180830                       │          │ Started     │ org.ops4j.pax.web-7.2.5           │ Provide Jetty engine support
+pax-jetty-http2                 │ 7.2.5                                  │          │ Uninstalled │ org.ops4j.pax.web-7.2.5           │ Optional additional feature to run Jetty with SPDY
+pax-http-jetty                  │ 7.2.5                                  │          │ Started     │ org.ops4j.pax.web-7.2.5           │
+```
+
+Here the pax version is `7.2.5` and comparing it with latest `develop` revealed that we were still referencing `4.3.0`.
+Quickly bumping the version to `7.2.5` and update the dependencies. 
+The diff can be found link:https://github.com/OpenNMS/opennms/compare/5eb9d4a..abb5641[here].
+Rebuilding and after rough 20 minutes later the original exception was gone.
+
+\o/
+
+I tried to see if the rest-endpoints were exposed correctly via OSGi
+
+```
+admin@opennms> feature:install jax-rs-shell-commands
+admin@opennms> rest:list-endpoints
+Listing all registered endpoints:
+/rest/datachoices
+/rest/flows
+/rest/classifications
+
+admin@opennms> rest:list-providers
+List all providers
+org.opennms.web.rest.support.ErrorResponseProvider@2ea42fe7
+com.fasterxml.jackson.jaxrs.json.JacksonJaxbJsonProvider@1986d251
+org.opennms.web.rest.support.NotFoundProvider@6d8bfe1c
+org.opennms.netmgt.flows.rest.internal.classification.CSVImportExceptionMapper@6227afe0
+org.opennms.web.rest.support.NoSuchElementProvider@795b6fc3
+org.opennms.netmgt.flows.rest.internal.classification.ClassificationExceptionMapper@67a7825c
+
+admin@opennms> rest:list-root-paths
+/rest
+```
+
+Indeed they were. 
+But better sure than sorry.
+
+```
+curl -X GET -u admin:admin http://localhost:8980/rest/opennms/classifications
+```
+
+Resulted in a 404.
+
+By accident I found the following log message
+
+```
+14:15:26.071 INFO [features-3-thread-1] Servlet Initialized
+14:15:26.078 INFO [features-3-thread-1] Binding bundle: [org.opennms.container.web.bridge [213]] to http service
+14:15:26.081 WARN [features-3-thread-1] Registered listener [331] is not enabled via 'osgi.http.whiteboard.listener' property.
+14:15:26.087 INFO [features-3-thread-1] No javax.websocket.Endpoint class found, WebSocketTracker is disabled
+```
+
+Looking at the link:[official documentation] revealed that this is the new way of exposing listeners through the `HttpService` (even if Karaf 4.2.2 is not yet OSGi 7 compatible).
+Adding the property when exposing the property solved that problem as well and the ReST services seem to work again.
+
+Good news is we got rid of the original exception.
+
+Bad news is, that we got more:
+
+```
+2019-02-13T18:58:06,689 WARN  org.eclipse.jetty.util:9.4.12.v20180830(196) [paxweb-config-1-thread-1] org.eclipse.jetty.jmx.MBeanContainer: bean: QueuedThreadPool[qtp406861626]@1840373a{STOPPED,8<=0<=200,i=0,q=0}[org.eclipse.jetty.util.thread.TryExecutor$$Lambda$530/193024621@70613cec]
+ javax.management.InstanceAlreadyExistsException: org.eclipse.jetty.util.thread:type=queuedthreadpool,id=0
+     at com.sun.jmx.mbeanserver.Repository.addMBean(Repository.java:437) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerWithRepository(DefaultMBeanServerInterceptor.java:1898) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerDynamicMBean(DefaultMBeanServerInterceptor.java:966) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerObject(DefaultMBeanServerInterceptor.java:900) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerMBean(DefaultMBeanServerInterceptor.java:324) ~[?:?]
+     at com.sun.jmx.mbeanserver.JmxMBeanServer.registerMBean(JmxMBeanServer.java:522) ~[?:?]
+     at org.eclipse.jetty.jmx.MBeanContainer.beanAdded(MBeanContainer.java:210) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addEventListener(ContainerLifeCycle.java:389) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:280) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:253) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.JettyServerImpl.start(JettyServerImpl.java:174) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Stopped.start(ServerControllerImpl.java:486) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.start(ServerControllerImpl.java:82) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerFactoryImpl$1.start(ServerControllerFactoryImpl.java:164) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Unconfigured.configure(ServerControllerImpl.java:795) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.configure(ServerControllerImpl.java:98) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.updateController(Activator.java:418) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.lambda$scheduleUpdateFactory$1(Activator.java:344) ~[?:?]
+     at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511) [?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) [?:?]
+     at java.lang.Thread.run(Thread.java:748) [?:?]
+
+...
+
+ javax.management.InstanceAlreadyExistsException: org.eclipse.jetty.jmx:type=mbeancontainer,id=0
+     at com.sun.jmx.mbeanserver.Repository.addMBean(Repository.java:437) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerWithRepository(DefaultMBeanServerInterceptor.java:1898) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerDynamicMBean(DefaultMBeanServerInterceptor.java:966) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerObject(DefaultMBeanServerInterceptor.java:900) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerMBean(DefaultMBeanServerInterceptor.java:324) ~[?:?]
+     at com.sun.jmx.mbeanserver.JmxMBeanServer.registerMBean(JmxMBeanServer.java:522) ~[?:?]
+     at org.eclipse.jetty.jmx.MBeanContainer.beanAdded(MBeanContainer.java:210) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:287) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:268) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addEventListener(ContainerLifeCycle.java:395) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:280) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:253) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.JettyServerImpl.start(JettyServerImpl.java:174) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Stopped.start(ServerControllerImpl.java:486) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.start(ServerControllerImpl.java:82) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerFactoryImpl$1.start(ServerControllerFactoryImpl.java:164) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Unconfigured.configure(ServerControllerImpl.java:795) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.configure(ServerControllerImpl.java:98) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.updateController(Activator.java:418) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.lambda$scheduleUpdateFactory$1(Activator.java:344) ~[?:?]
+     at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511) [?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) [?:?]
+     at java.lang.Thread.run(Thread.java:748) [?:?]
+
+...
+
+ 2019-02-13T18:58:10,773 ERROR org.opennms.plugin.pluginmanager.pluginmanager-core:1.2.0(340) [features-3-thread-1] org.opennms.features.pluginmgr.PluginManagerImpl: unable to load data for local karaf instance localhost
+ java.lang.RuntimeException: problem updating data from karaf Instance 'localhost'
+     at org.opennms.features.pluginmgr.PluginManagerImpl.refreshKarafEntry(PluginManagerImpl.java:419) ~[?:?]
+     at org.opennms.features.pluginmgr.PluginManagerImpl.load(PluginManagerImpl.java:1211) ~[?:?]
+     at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[?:?]
+     at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62) ~[?:?]
+     at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43) ~[?:?]
+     at java.lang.reflect.Method.invoke(Method.java:498) ~[?:?]
+     at org.apache.aries.blueprint.utils.ReflectionUtils.invoke(ReflectionUtils.java:337) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.invoke(BeanRecipe.java:835) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.runBeanProcInit(BeanRecipe.java:591) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.internalCreate2(BeanRecipe.java:703) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.internalCreate(BeanRecipe.java:666) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe$1.call(AbstractRecipe.java:81) ~[?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe.create(AbstractRecipe.java:90) ~[?:?]
+     at org.apache.aries.blueprint.di.RefRecipe.internalCreate(RefRecipe.java:62) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe.create(AbstractRecipe.java:108) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.setProperty(BeanRecipe.java:810) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.setProperties(BeanRecipe.java:784) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.setProperties(BeanRecipe.java:765) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.internalCreate2(BeanRecipe.java:699) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.internalCreate(BeanRecipe.java:666) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe$1.call(AbstractRecipe.java:81) ~[?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe.create(AbstractRecipe.java:90) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintRepository.createInstances(BlueprintRepository.java:360) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintRepository.createAll(BlueprintRepository.java:190) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintContainerImpl.instantiateEagerComponents(BlueprintContainerImpl.java:717) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintContainerImpl.doRun(BlueprintContainerImpl.java:413) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintContainerImpl.run(BlueprintContainerImpl.java:278) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintExtender.createContainer(BlueprintExtender.java:299) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintExtender.createContainer(BlueprintExtender.java:268) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintExtender.createContainer(BlueprintExtender.java:264) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintExtender.modifiedBundle(BlueprintExtender.java:254) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$Tracked.customizerModified(BundleHookBundleTracker.java:500) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$Tracked.customizerModified(BundleHookBundleTracker.java:433) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$AbstractTracked.track(BundleHookBundleTracker.java:725) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$Tracked.bundleChanged(BundleHookBundleTracker.java:463) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$BundleEventHook.event(BundleHookBundleTracker.java:422) ~[?:?]
+     at org.apache.felix.framework.util.SecureAction.invokeBundleEventHook(SecureAction.java:1179) ~[?:?]
+     at org.apache.felix.framework.EventDispatcher.createWhitelistFromHooks(EventDispatcher.java:730) ~[?:?]
+     at org.apache.felix.framework.EventDispatcher.fireBundleEvent(EventDispatcher.java:485) ~[?:?]
+     at org.apache.felix.framework.Felix.fireBundleEvent(Felix.java:4579) ~[?:?]
+     at org.apache.felix.framework.Felix.startBundle(Felix.java:2174) ~[?:?]
+     at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:998) ~[?:?]
+     at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:984) ~[?:?]
+     at org.apache.karaf.features.internal.service.BundleInstallSupportImpl.startBundle(BundleInstallSupportImpl.java:161) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.startBundle(FeaturesServiceImpl.java:1116) ~[?:?]
+     at org.apache.karaf.features.internal.service.Deployer.deploy(Deployer.java:997) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.doProvision(FeaturesServiceImpl.java:1025) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.lambda$doProvisionInThread$13(FeaturesServiceImpl.java:964) ~[?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) [?:?]
+     at java.lang.Thread.run(Thread.java:748) [?:?]
+ Caused by: java.lang.RuntimeException: problem refreshing installed licences for karafInstance=localhost karafInstanceUrl=http://localhost:8980/opennms:
+     at org.opennms.features.pluginmgr.PluginManagerImpl.refreshKarafEntry(PluginManagerImpl.java:366) ~[?:?]
+     ... 53 more
+ Caused by: java.lang.RuntimeException: getLicenceMap Failed : HTTP error code : 404
+     at org.opennms.karaf.licencemgr.rest.client.jerseyimpl.LicenceManagerClientRestJerseyImpl.getLicenceMap(LicenceManagerClientRestJerseyImpl.java:296) ~[?:?]
+     at org.opennms.features.pluginmgr.PluginManagerImpl.refreshKarafEntry(PluginManagerImpl.java:359) ~[?:?]
+     ... 53 more
+
+  ...
+
+   2019-02-13T18:58:12,566 ERROR org.apache.karaf.features.core:4.2.2(11) [activator-1-thread-2] org.apache.karaf.features.internal.service.BootFeaturesInstaller: Error installing boot features
+ org.apache.karaf.features.internal.util.MultiException: Error restarting bundles:
+     Activator start error in bundle org.ops4j.pax.web.pax-web-extender-whiteboard [342].
+     at org.apache.karaf.features.internal.service.Deployer.deploy(Deployer.java:1005) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.doProvision(FeaturesServiceImpl.java:1025) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.lambda$doProvisionInThread$13(FeaturesServiceImpl.java:964) ~[?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) [?:?]
+     at java.lang.Thread.run(Thread.java:748) [?:?]
+     Suppressed: org.osgi.framework.BundleException: Activator start error in bundle org.ops4j.pax.web.pax-web-extender-whiteboard [342].
+         at org.apache.felix.framework.Felix.activateBundle(Felix.java:2290) ~[?:?]
+         at org.apache.felix.framework.Felix.startBundle(Felix.java:2146) ~[?:?]
+         at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:998) ~[?:?]
+         at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:984) ~[?:?]
+         at org.apache.karaf.features.internal.service.BundleInstallSupportImpl.startBundle(BundleInstallSupportImpl.java:161) ~[?:?]
+         at org.apache.karaf.features.internal.service.FeaturesServiceImpl.startBundle(FeaturesServiceImpl.java:1116) ~[?:?]
+         at org.apache.karaf.features.internal.service.Deployer.deploy(Deployer.java:997) ~[?:?]
+         at org.apache.karaf.features.internal.service.FeaturesServiceImpl.doProvision(FeaturesServiceImpl.java:1025) ~[?:?]
+         at org.apache.karaf.features.internal.service.FeaturesServiceImpl.lambda$doProvisionInThread$13(FeaturesServiceImpl.java:964) ~[?:?]
+         at java.util.concurrent.FutureTask.run(FutureTask.java:266) [?:?]
+         at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) [?:?]
+         at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) [?:?]
+         at java.lang.Thread.run(Thread.java:748) [?:?]
+     Caused by: java.lang.IllegalStateException: HttpService must be implementing Pax-Web WebContainer!
+         at org.ops4j.pax.web.extender.whiteboard.internal.ExtendedHttpServiceRuntime.serviceChanged(ExtendedHttpServiceRuntime.java:110) ~[?:?]
+         at org.ops4j.pax.web.extender.whiteboard.internal.ExtendedHttpServiceRuntime.serviceChanged(ExtendedHttpServiceRuntime.java:44) ~[?:?]
+         at org.ops4j.pax.web.extender.whiteboard.internal.util.tracker.ReplaceableService.bind(ReplaceableService.java:86) ~[?:?]
+         at org.ops4j.pax.web.extender.whiteboard.internal.util.tracker.ReplaceableService$Customizer.addingService(ReplaceableService.java:105) ~[?:?]
+         at org.osgi.util.tracker.ServiceTracker$Tracked.customizerAdding(ServiceTracker.java:941) ~[?:?]
+         at org.osgi.util.tracker.ServiceTracker$Tracked.customizerAdding(ServiceTracker.java:870) ~[?:?]
+         at org.osgi.util.tracker.AbstractTracked.trackAdding(AbstractTracked.java:256) ~[?:?]
+         at org.osgi.util.tracker.AbstractTracked.trackInitial(AbstractTracked.java:183) ~[?:?]
+         at org.osgi.util.tracker.ServiceTracker.open(ServiceTracker.java:318) ~[?:?]
+         at org.osgi.util.tracker.ServiceTracker.open(ServiceTracker.java:261) ~[?:?]
+         at org.ops4j.pax.web.extender.whiteboard.internal.util.tracker.ReplaceableService.start(ReplaceableService.java:72) ~[?:?]
+         at org.ops4j.pax.web.extender.whiteboard.internal.ExtendedHttpServiceRuntime.start(ExtendedHttpServiceRuntime.java:155) ~[?:?]
+         at org.ops4j.pax.web.extender.whiteboard.internal.Activator.start(Activator.java:98) ~[?:?]
+         at org.apache.felix.framework.util.SecureAction.startActivator(SecureAction.java:697) ~[?:?]
+         at org.apache.felix.framework.Felix.activateBundle(Felix.java:2240) ~[?:?]
+         ... 12 more
+```
+
+The first expcetions should be investigated.
+Especially what is wrong with the plugin manager.
+The last exception is probably the same as we already see occasionaly in the log, due to our link:/posts/development/9-hindenburg-effect[http bridge hack].

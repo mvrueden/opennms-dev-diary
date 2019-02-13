@@ -1,0 +1,60 @@
+---
+title: "The Hindenburg Effect - And our Http Bridge"
+date: 2019-02-13T15:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: "https://upload.wikimedia.org/wikipedia/commons/0/03/Hindenburg_disaster_%281%29.jpg"
+---
+:icons: font
+
+In the very past OpenNMS was mostly driven by Jetty and Spring*.
+Probably a more flexible solution needed to be found, as with a big application like OpenNMS dependency issues are always present.
+For example dependency A requires dependency B in Version 1, but dependency C requires the same dependency B in Version 2.
+Modern containers - such as Apache Karaf (an OSGi container) - can solve these problems.
+Besides that OSGi offers a nice API and Implementation differentiation.
+So there was the time, Apache Karaf was introduced.
+
+The main problem was how to integrate it with the current Jetty and Daemon Lifecycle.
+By default Karaf has the capability to run web applications, but that is not really working with Spring especially in context with our Daemon lifecycle.
+Instead of integrating the daemons and the web application into Karaf itself, another approach was taken: 
+
+Jetty is running as the main container, starting the Karaf Container at some point in its link:https://github.com/opennms/opennms/blob/45618715faaf892a44e9b2ba7fa9f36daf734840/container/servlet/src/main/java/org/opennms/container/web/WebAppListener.java[lifecycle].
+
+There are basically two major problems with this approach:
+ 
+ 1. A lot of classes are already known by jetty through its class path (lib directory) and must now be made available to Karaf (due to its class encapsulation mechanisms)
+ 1. OSGi bundles must consume services, which are defined by Spring
+ 1. OSGi has already something called `HttpService` to deal with anything `http/web`, e.g. starting a servlet server
+
+For the first problem Karaf provides the concept of a `custom.properties` file. 
+This forwards classes known to the JVM running the container to the container itself.
+That allowed for new bundles requiring classes already exposed via `${OPENNMS_HOME}/lib` to be just forwarded.
+
+The second problem was solved by a custom link:https://github.com/opennms/opennms/blob/e6dbdc1a9923fcd31beb668f74be140191576e9a/core/soa/src/main/java/org/opennms/core/soa/support/ServiceFactoryBean.java#L51[ServiceRegistry] which just forwards services from the Jetty world to the OSGi service registration.
+Again this does not work out of the box, so a custom `onmsgi:service` tag was introduced to spring, in order to make this happen.
+The following example shows this in action.
+```
+ <bean id="dataSource" class="org.opennms.core.db.DataSourceFactoryBean" />
+  <onmsgi:service interface="javax.sql.DataSource" ref="dataSource"/>
+```
+
+The solution to the third problem was a bit more tricky and dirty.
+OSGi defines the service `HttpService` icon:share-square-o[link="https://osgi.org/specification/osgi.cmpn/7.0.0/service.http.html", window="_blank"] to deal with anything web (server) related. This means, Apache Karaf can by default start servlet containers such as tomcat or jetty and thus has their full capabilities.
+
+In order to get the existing OpenNMS architecture integrate with Karaf the "native way" a lot of effort needed to be put into it.
+Besides this, OpenNMS was already a running Jetty Server.
+A less "work-heavy" solution needed to be found, to bridge the gap between the two worlds and integrate Apache Karaf with OpenNMS (and not the other way around).
+That is when a module called `container/bridge` was introduced to expose the running Jetty as an `HttpService` to the underlying Karaf container. 
+In order to bend Apache Karaf to their needs everything `http` were modified to not start the http stuff from Karaf.
+Back then, the official felix http module was copied over to the link:https://github.com/opennms/opennms/tree/4018b6700d7804a19734201c5f93fca47d63a838/container/bridge/src/main/java/org/opennms/container/web/felix/base/internal[OpenNMS code base] (praise or course the open source gods here).
+
+All of this seemed probably reasonable at that time.
+However this approach introduced so many issues.
+Some are known to us, and probably some not known to us.
+
+The same is probably true about the Germans.
+They also thought flying big cigarettes out of steel filled with very burnable and explosive gas is managable and will not cause any issues.
+Thus the name "The Hindenburg Effect"
+
+This is in no way meant to be a blaming, but just a write up of problems we are facing on a regulary basis.
+See link:/posts/development/10-karaf-update-4.2.2/[here] for the problems we faced when upgrading Karaf to 4.2.2.
