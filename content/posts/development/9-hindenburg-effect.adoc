@@ -57,4 +57,4 @@ They also thought flying big cigarettes out of steel filled with very burnable a
 Thus the name "The Hindenburg Effect"
 
 This is in no way meant to be a blaming, but just a write up of problems we are facing on a regulary basis.
-See link:/posts/development/10-karaf-update-4.2.2/[here] for the problems we faced when upgrading Karaf to 4.2.2.
+See link:/posts/karaf-upgrade/4.2.2/day1/[here] for the problems we faced when upgrading Karaf to 4.2.2.
