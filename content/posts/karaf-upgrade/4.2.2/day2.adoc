@@ -1,0 +1,285 @@
+---
+title: "Upgrading Karaf to 4.2.2 - Day 2"
+date: 2019-02-14T18:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: "https://images.pexels.com/photos/36031/firefighter-fire-portrait-training.jpg?auto=compress&cs=tinysrgb&h=650&w=940"
+---
+:icons: font
+
+While link:/posts/karaf-upgrade/4.2.2/day1[yesterday] I managed to fix One icon:check[] exception, a bunch of more showed up.
+I wanted to investigate those isuses today, but found a weird behaviour:
+
+After a restart of OpenNMS the web console was no longer available.
+
+Besides that, I got a 
+
+```
+ClassNotFoundException org.eclipse.jetty.jaas.JAASLoginService
+```
+
+in the logs.
+
+First thing I did was to add the dependency 
+
+```
+<dependency>
+    <groupId>org.eclipse.jetty</groupId>
+    <artifactId>jetty-jaas</artifactId>
+    <version>${jettyVersion}</version>
+</dependency>
+```
+
+to OpenNMS and copy it to the lib directory.
+
+Afterwards, the exception was gone, but accessing `http://localhost:8980/opennms` resulted in a 404.
+
+Yet again unsure why this was happening, I blindly browsed through the code where at some point I saw that a link:https://github.com/opennms/opennms/blob/47a0b591e9dd04d6b3bef3d3765bac13eb12cf35/opennms-jetty/src/main/java/org/opennms/netmgt/jetty/JettyServer.java#L93[jetty.xml file was referenced and loaded]. 
+So let's see if there are any `jetty.xml` files in the source.
+
+```
+NMS-10539 [jira/NMS-10539] % find . -iname "jetty.xml" | grep -v target
+./core/upgrade/src/test/resources/etc/examples/jetty.xml
+./opennms-jetty/src/main/resources/org/opennms/netmgt/jetty/jetty.xml
+```
+
+Looking at the link:https://github.com/opennms/opennms/blob/6a886a06f270f41186b1e25d6a3cee0652d75b67/opennms-jetty/src/main/resources/org/opennms/netmgt/jetty/jetty.xml[jetty.xml] revealed nothing special.
+
+Weird.
+
+Let's perform some checks
+
+ - `./bin/opennms -v status` reveals everything running
+ - `curl -X GET -u admin:admin http://localhost:8980/opennms/rest/info` -> 404
+ - `curl -X GET http://localhost:8980/opennms` -> 404
+ - Connecting to the Karaf Console -> Connection Refused
+
+Hmmm...
+
+Are the Server and Karaf actually started?
+
+Debugging into the the classes link:https://github.com/opennms/opennms/blob/45618715faaf892a44e9b2ba7fa9f36daf734840/container/servlet/src/main/java/org/opennms/container/web/WebAppListener.java#[WebAppListener] and link:https://github.com/opennms/opennms/blob/073bb09274073a757602705224a57613a4890a66/opennms-jetty/src/main/java/org/opennms/netmgt/jetty/OpenNMSWebAppProvider.java[OpenNMSWebAppProvider] revealed that those classes are never invoked.
+
+Again, this is very weird.
+
+It took me some time to look at the actual deployed `jetty.xml` in `${OPENNMS_HOME}/etc/jetty.xml`. 
+However it was very clear, that the deployed file of `jetty.xml` was a completely different one than the one in OpenNMS' source tree.
+
+For clarification. link:https://github.com/ops4j/org.ops4j.pax.web/blob/pax-web-7.2.x/pax-web-features/src/main/resources/jetty.xml[This] was deployed. And link:https://github.com/opennms/opennms/blob/6a886a06f270f41186b1e25d6a3cee0652d75b67/opennms-jetty/src/main/resources/org/opennms/netmgt/jetty/jetty.xml[this] is in the OpenNMS' source tree. 
+
+That at least explains, why Jetty is not starting the OpenNMS Web App and with that the Karaf Container.
+And also the `ClassNotFoundException org.eclipse.jetty.jaas.JAASLoginService`.
+
+At this point I verified, which `jetty.xml` should be there by default (Pre Karaf 4.2.2 Upgrade).
+
+```
+% find . -type f -iname "*jetty*xml"
+./etc/examples/jetty.xml
+./system/org/ops4j/pax/web/pax-web-features/4.3.0/pax-web-features-4.3.0-jettyconfig.xml
+./system/org/ops4j/pax/web/pax-web-features/6.0.9/pax-web-features-6.0.9-jettyconfig.xml
+```
+
+It turns out none.
+
+Okay, so now we only have to figure out where the `jetty.xml` is leaking in from.
+Remember link:/posts/karaf-upgrade/4.2.2/day1[yesterday] we resolved the dependency tree of the feature `http`.
+So I reviewed those, and look what feature `pax-http-jetty` revealed:
+
+```
+admin@opennms> feature:info pax-http-jetty
+Feature pax-http-jetty 4.3.0
+Feature configuration:
+  org.ops4j.pax.web
+Feature configuration files:
+  /etc/jetty.xml
+Feature depends on:
+  pax-jetty [7.0,10.0)
+Feature contains followed bundles:
+  mvn:org.ow2.asm/asm-all/5.0.2 start-level=20
+  mvn:org.apache.xbean/xbean-bundleutils/4.1 start-level=20
+  mvn:org.apache.xbean/xbean-reflect/4.1 start-level=20
+  mvn:org.apache.xbean/xbean-finder/4.1 start-level=20
+  mvn:org.ops4j.pax.web/pax-web-api/4.3.0 start-level=30
+  mvn:org.ops4j.pax.web/pax-web-spi/4.3.0 start-level=30
+  mvn:org.ops4j.pax.web/pax-web-runtime/4.3.0 start-level=30
+  mvn:org.ops4j.pax.web/pax-web-jetty/4.3.0 start-level=30
+Feature has no conditionals.
+```
+
+A `jetty.xml`. 
+In order to get rid of that, we have to manually override the feature definition, which will then solve the problem.
+For that I copied over the raw feature-definition and commented out the `jetty.xml` bits:
+
+```
+<!-- ################ START OPENNMS CUSTOMIZATION ############ -->
+	<!-- <repository>mvn:org.ops4j.pax.web/pax-web-features/7.2.5/xml/features</repository> -->
+	<repository>mvn:org.ops4j.pax.web/pax-web-features/${paxWebVersion}/xml/features</repository>
+
+    <!-- We override this feature, as it leaks a jetty.xml into etc, which may cause issues -->
+    <feature name="pax-http-jetty" version="${paxWebVersion}">
+        <!-- DO NOT EXPOSE THIS -->
+         <!--<configfile finalname="${karaf.etc}/jetty.xml">mvn:org.ops4j.pax.web/pax-web-features/7.2.5/xml/jettyconfig</configfile>-->
+         <config name="org.ops4j.pax.web">
+             org.osgi.service.http.port=8181
+             javax.servlet.context.tempdir=${karaf.data}/pax-web-jsp
+             org.ops4j.pax.web.config.file=${karaf.etc}/jetty.xml
+         </config>
+         <feature>scr</feature>
+         <feature version="[9.3,10.0)">pax-jetty</feature>
+
+         <feature>pax-web-core</feature>
+         <bundle start-level="30">mvn:org.ops4j.pax.web/pax-web-runtime/${paxWebVersion}</bundle>
+         <bundle start-level="30">mvn:org.ops4j.pax.web/pax-web-jetty/${paxWebVersion}</bundle>
+
+         <capability>
+             pax.http.provider;provider:=jetty
+         </capability>
+
+         <conditional>
+             <condition>pax-keycloak</condition>
+             <feature>pax-keycloak-http-jetty</feature>
+         </conditional>
+     </feature>
+	<!-- ################ END OPENNMS CUSTOMIZATION ############ -->
+```
+
+Rebuilding and starting OpenNMS solved the issue that the OpenNMS' Web App is no longer working \o/.
+
+The only issues which are left, are the same exceptions than link:/posts/karaf-upgrade/4.2.2/day1[yesterday].
+
+```
+javax.management.InstanceAlreadyExistsException: org.eclipse.jetty.util.thread:type=queuedthreadpool,id=0
+     at com.sun.jmx.mbeanserver.Repository.addMBean(Repository.java:437) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerWithRepository(DefaultMBeanServerInterceptor.java:1898) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerDynamicMBean(DefaultMBeanServerInterceptor.java:966) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerObject(DefaultMBeanServerInterceptor.java:900) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerMBean(DefaultMBeanServerInterceptor.java:324) ~[?:?]
+     at com.sun.jmx.mbeanserver.JmxMBeanServer.registerMBean(JmxMBeanServer.java:522) ~[?:?]
+     at org.eclipse.jetty.jmx.MBeanContainer.beanAdded(MBeanContainer.java:210) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addEventListener(ContainerLifeCycle.java:389) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:280) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:253) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.JettyServerImpl.start(JettyServerImpl.java:174) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Stopped.start(ServerControllerImpl.java:486) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.start(ServerControllerImpl.java:82) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerFactoryImpl$1.start(ServerControllerFactoryImpl.java:164) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Unconfigured.configure(ServerControllerImpl.java:795) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.configure(ServerControllerImpl.java:98) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.updateController(Activator.java:418) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.lambda$scheduleUpdateFactory$1(Activator.java:344) ~[?:?]
+     at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511) [?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) [?:?]
+     at java.lang.Thread.run(Thread.java:748) [?:?]
+
+...
+
+javax.management.InstanceAlreadyExistsException: org.eclipse.jetty.jmx:type=mbeancontainer,id=0
+     at com.sun.jmx.mbeanserver.Repository.addMBean(Repository.java:437) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerWithRepository(DefaultMBeanServerInterceptor.java:1898) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerDynamicMBean(DefaultMBeanServerInterceptor.java:966) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerObject(DefaultMBeanServerInterceptor.java:900) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerMBean(DefaultMBeanServerInterceptor.java:324) ~[?:?]
+     at com.sun.jmx.mbeanserver.JmxMBeanServer.registerMBean(JmxMBeanServer.java:522) ~[?:?]
+     at org.eclipse.jetty.jmx.MBeanContainer.beanAdded(MBeanContainer.java:210) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:287) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:268) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addEventListener(ContainerLifeCycle.java:395) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:280) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:253) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.JettyServerImpl.start(JettyServerImpl.java:174) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Stopped.start(ServerControllerImpl.java:486) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.start(ServerControllerImpl.java:82) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerFactoryImpl$1.start(ServerControllerFactoryImpl.java:164) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Unconfigured.configure(ServerControllerImpl.java:795) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.configure(ServerControllerImpl.java:98) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.updateController(Activator.java:418) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.lambda$scheduleUpdateFactory$1(Activator.java:344) ~[?:?]
+     at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511) [?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) [?:?]
+     at java.lang.Thread.run(Thread.java:748) [?:?]
+
+...
+
+javax.management.InstanceAlreadyExistsException: org.eclipse.jetty.util.thread:type=queuedthreadpool,id=0
+     at com.sun.jmx.mbeanserver.Repository.addMBean(Repository.java:437) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerWithRepository(DefaultMBeanServerInterceptor.java:1898) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerDynamicMBean(DefaultMBeanServerInterceptor.java:966) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerObject(DefaultMBeanServerInterceptor.java:900) ~[?:?]
+     at com.sun.jmx.interceptor.DefaultMBeanServerInterceptor.registerMBean(DefaultMBeanServerInterceptor.java:324) ~[?:?]
+     at com.sun.jmx.mbeanserver.JmxMBeanServer.registerMBean(JmxMBeanServer.java:522) ~[?:?]
+     at org.eclipse.jetty.jmx.MBeanContainer.beanAdded(MBeanContainer.java:210) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addEventListener(ContainerLifeCycle.java:389) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:280) ~[?:?]
+     at org.eclipse.jetty.util.component.ContainerLifeCycle.addBean(ContainerLifeCycle.java:253) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.JettyServerImpl.start(JettyServerImpl.java:174) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Stopped.start(ServerControllerImpl.java:486) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.start(ServerControllerImpl.java:82) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerFactoryImpl$1.start(ServerControllerFactoryImpl.java:164) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl$Unconfigured.configure(ServerControllerImpl.java:795) ~[?:?]
+     at org.ops4j.pax.web.service.jetty.internal.ServerControllerImpl.configure(ServerControllerImpl.java:98) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.updateController(Activator.java:418) ~[?:?]
+     at org.ops4j.pax.web.service.internal.Activator.lambda$scheduleUpdateFactory$1(Activator.java:344) ~[?:?]
+     at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511) [?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.runBeanProcInit(BeanRecipe.java:591) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.internalCreate2(BeanRecipe.java:703) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.internalCreate(BeanRecipe.java:666) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe$1.call(AbstractRecipe.java:81) ~[?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe.create(AbstractRecipe.java:90) ~[?:?]
+     at org.apache.aries.blueprint.di.RefRecipe.internalCreate(RefRecipe.java:62) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe.create(AbstractRecipe.java:108) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.setProperty(BeanRecipe.java:810) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.setProperties(BeanRecipe.java:784) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.setProperties(BeanRecipe.java:765) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.internalCreate2(BeanRecipe.java:699) ~[?:?]
+     at org.apache.aries.blueprint.container.BeanRecipe.internalCreate(BeanRecipe.java:666) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe$1.call(AbstractRecipe.java:81) ~[?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) ~[?:?]
+     at org.apache.aries.blueprint.di.AbstractRecipe.create(AbstractRecipe.java:90) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintRepository.createInstances(BlueprintRepository.java:360) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintRepository.createAll(BlueprintRepository.java:190) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintContainerImpl.instantiateEagerComponents(BlueprintContainerImpl.java:717) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintContainerImpl.doRun(BlueprintContainerImpl.java:413) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintContainerImpl.run(BlueprintContainerImpl.java:278) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintExtender.createContainer(BlueprintExtender.java:299) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintExtender.createContainer(BlueprintExtender.java:268) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintExtender.createContainer(BlueprintExtender.java:264) ~[?:?]
+     at org.apache.aries.blueprint.container.BlueprintExtender.modifiedBundle(BlueprintExtender.java:254) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$Tracked.customizerModified(BundleHookBundleTracker.java:500) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$Tracked.customizerModified(BundleHookBundleTracker.java:433) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$AbstractTracked.track(BundleHookBundleTracker.java:725) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$Tracked.bundleChanged(BundleHookBundleTracker.java:463) ~[?:?]
+     at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$BundleEventHook.event(BundleHookBundleTracker.java:422) ~[?:?]
+     at org.apache.felix.framework.util.SecureAction.invokeBundleEventHook(SecureAction.java:1179) ~[?:?]
+     at org.apache.felix.framework.EventDispatcher.createWhitelistFromHooks(EventDispatcher.java:730) ~[?:?]
+     at org.apache.felix.framework.EventDispatcher.fireBundleEvent(EventDispatcher.java:485) ~[?:?]
+     at org.apache.felix.framework.Felix.fireBundleEvent(Felix.java:4579) ~[?:?]
+     at org.apache.felix.framework.Felix.startBundle(Felix.java:2174) ~[?:?]
+     at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:998) ~[?:?]
+     at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:984) ~[?:?]
+     at org.apache.karaf.features.internal.service.BundleInstallSupportImpl.startBundle(BundleInstallSupportImpl.java:161) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.startBundle(FeaturesServiceImpl.java:1116) ~[?:?]
+     at org.apache.karaf.features.internal.service.Deployer.deploy(Deployer.java:997) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.doProvision(FeaturesServiceImpl.java:1025) ~[?:?]
+     at org.apache.karaf.features.internal.service.FeaturesServiceImpl.lambda$doProvisionInThread$13(FeaturesServiceImpl.java:964) ~[?:?]
+     at java.util.concurrent.FutureTask.run(FutureTask.java:266) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) [?:?]
+     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) [?:?]
+     at java.lang.Thread.run(Thread.java:748) [?:?]
+ Caused by: java.lang.RuntimeException: problem refreshing installed licences for karafInstance=localhost karafInstanceUrl=http://localhost:8980/opennms:
+     at org.opennms.features.pluginmgr.PluginManagerImpl.refreshKarafEntry(PluginManagerImpl.java:366) ~[?:?]
+     ... 53 more
+ Caused by: java.lang.RuntimeException: getLicenceMap Failed : HTTP error code : 404
+     at org.opennms.karaf.licencemgr.rest.client.jerseyimpl.LicenceManagerClientRestJerseyImpl.getLicenceMap(LicenceManagerClientRestJerseyImpl.java:296) ~[?:?]
+     at org.opennms.features.pluginmgr.PluginManagerImpl.refreshKarafEntry(PluginManagerImpl.java:359) ~[?:?]
+     ... 53 more
+
+```
+
+So let's find out what is going on here, at another day.
+
+Also the `jetty-jass` dependency is not really needed as it was caused by the leaked `jetty.xml` file.
