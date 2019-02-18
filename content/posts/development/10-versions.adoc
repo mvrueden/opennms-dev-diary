@@ -1,0 +1,36 @@
+---
+title: "Meridian Versioniong"
+date: 2019-02-15T15:00:00+01:00
+tags: ["meridian", "versioning"]
+draft: false
+featured_image: "https://images.pexels.com/photos/1314543/pexels-photo-1314543.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=750&w=1260"
+---
+:icons: font
+
+I always find myself wondering which Horizon Version a Meridian release is based on.
+To solve this problem once and for all, I looked them all up by looking at the pom.xml of each `foundation*` branch.
+
+#### Which Horizon Version is Meridian based on?
+
+|=======
+|Meridian | Horizon | Branch
+|M2015  
+|H14
+|foundation
+
+|M2016
+|H17
+|foundation-2016
+
+|M2017
+|H19
+|foundation-2017
+
+|M2018
+|H21
+|foundation-2018
+
+|M2019
+|TBA, most likely H24
+|foundation-2019 (not yet available)
+|=======
