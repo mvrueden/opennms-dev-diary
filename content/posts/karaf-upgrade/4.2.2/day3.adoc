@@ -324,9 +324,7 @@ opennms-bridge-http-service -> pax-http -> pax-http-jetty -> pax-jetty
 ```
 
 If the `opennms-bridge-http-service` is not installing `pax-http`, the all dependant features (except maybe `pax-web-core`) should no longer be installed.
-Let's do this by modifying the `opennms-bridge-http-service` and not install feature `pax-http`.
-
-TODO MVR add diff
+Let's do this by modifying the `opennms-bridge-http-service` and not install feature `pax-http` icon:share-square-o[link="https://github.com/opennms/opennms/blob/abb56411b86889985a5bffde977241e5950a54c9/container/features/src/main/resources/karaf/standard.xml#L592", window="_blank"].
 
 After a rebuild and restart of OpenNMS let's verify if that worked.
 
@@ -413,8 +411,8 @@ Looking at our `standard.xml` feature defintion
 reveals, that we install `org.ow2.asm/asm-all/5.0.2` which is not `>=6.0.0`.
 As the comment above states `Copied out of PAX Web features.xml at mvn:org.ops4j.pax.web/pax-web-features/${paxWebVersion}/xml/features`, we should take a look at that file and compare it with the current definition. 
 The definitions were not directly copied, but merged together.
-Finding the changes were a bit tedious, but mainly the wrong `asm` version aws dependet on.
-The complete diff can be found link:[here].
+Finding the changes were a bit tedious, but mainly the wrong `asm` version was dependet on.
+We manually fixed this by using the right versions.
 
 Yet another rebuild and then we can see if that solved the issue.
 
