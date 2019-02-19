@@ -1,0 +1,482 @@
+---
+title: "Upgrading Karaf to 4.2.2 - Day 3"
+date: 2019-02-18T12:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: "https://images.pexels.com/photos/260397/pexels-photo-260397.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=750&w=1260"
+---
+:icons: font
+
+Last week I started upgrading Karaf to version 4.2.2.
+You can see the endevour started at link:/posts/karaf-upgrade/4.2.2/day1[Day 1] and continued at link:/posts/karaf-upgrade/4.2.2/day1[Day 2].
+At link:/posts/karaf-upgrade/4.2.2/day1[Day 2] we left off with three exception in the `karaf.log`.
+While two were something like "Cannot register an already registered Mbean" which are most likely caused by some code (inside Karaf) trying to register already registered Mbeans by Jetty itself. So the "real" Exception to investigate here is the issue with the plugin manager.
+
+```
+java.lang.RuntimeException: problem updating data from karaf Instance 'localhost'
+    at org.opennms.features.pluginmgr.PluginManagerImpl.refreshKarafEntry(PluginManagerImpl.java:419) ~[?:?]
+    at org.opennms.features.pluginmgr.PluginManagerImpl.load(PluginManagerImpl.java:1211) ~[?:?]
+    at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[?:?]
+    at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62) ~[?:?]
+    at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43) ~[?:?]
+    at java.lang.reflect.Method.invoke(Method.java:498) ~[?:?]
+    at org.apache.aries.blueprint.utils.ReflectionUtils.invoke(ReflectionUtils.java:337) ~[?:?]
+    at org.apache.aries.blueprint.container.BeanRecipe.invoke(BeanRecipe.java:835) ~[?:?]
+    at org.apache.aries.blueprint.container.BeanRecipe.runBeanProcInit(BeanRecipe.java:591) ~[?:?]
+    at org.apache.aries.blueprint.container.BeanRecipe.internalCreate2(BeanRecipe.java:703) ~[?:?]
+    at org.apache.aries.blueprint.container.BeanRecipe.internalCreate(BeanRecipe.java:666) ~[?:?]
+    at org.apache.aries.blueprint.di.AbstractRecipe$1.call(AbstractRecipe.java:81) ~[?:?]
+    at java.util.concurrent.FutureTask.run(FutureTask.java:266) ~[?:?]
+    at org.apache.aries.blueprint.di.AbstractRecipe.create(AbstractRecipe.java:90) ~[?:?]
+    at org.apache.aries.blueprint.di.RefRecipe.internalCreate(RefRecipe.java:62) ~[?:?]
+    at org.apache.aries.blueprint.di.AbstractRecipe.create(AbstractRecipe.java:108) ~[?:?]
+    at org.apache.aries.blueprint.container.BeanRecipe.setProperty(BeanRecipe.java:810) ~[?:?]
+    at org.apache.aries.blueprint.container.BeanRecipe.setProperties(BeanRecipe.java:784) ~[?:?]
+    at org.apache.aries.blueprint.container.BeanRecipe.setProperties(BeanRecipe.java:765) ~[?:?]
+    at org.apache.aries.blueprint.container.BeanRecipe.internalCreate2(BeanRecipe.java:699) ~[?:?]
+    at org.apache.aries.blueprint.container.BeanRecipe.internalCreate(BeanRecipe.java:666) ~[?:?]
+    at org.apache.aries.blueprint.di.AbstractRecipe$1.call(AbstractRecipe.java:81) ~[?:?]
+    at java.util.concurrent.FutureTask.run(FutureTask.java:266) ~[?:?]
+    at org.apache.aries.blueprint.di.AbstractRecipe.create(AbstractRecipe.java:90) ~[?:?]
+    at org.apache.aries.blueprint.container.BlueprintRepository.createInstances(BlueprintRepository.java:360) ~[?:?]
+    at org.apache.aries.blueprint.container.BlueprintRepository.createAll(BlueprintRepository.java:190) ~[?:?]
+    at org.apache.aries.blueprint.container.BlueprintContainerImpl.instantiateEagerComponents(BlueprintContainerImpl.java:717) ~[?:?]
+    at org.apache.aries.blueprint.container.BlueprintContainerImpl.doRun(BlueprintContainerImpl.java:413) ~[?:?]
+    at org.apache.aries.blueprint.container.BlueprintContainerImpl.run(BlueprintContainerImpl.java:278) ~[?:?]
+    at org.apache.aries.blueprint.container.BlueprintExtender.createContainer(BlueprintExtender.java:299) ~[?:?]
+    at org.apache.aries.blueprint.container.BlueprintExtender.createContainer(BlueprintExtender.java:268) ~[?:?]
+    at org.apache.aries.blueprint.container.BlueprintExtender.createContainer(BlueprintExtender.java:264) ~[?:?]
+    at org.apache.aries.blueprint.container.BlueprintExtender.modifiedBundle(BlueprintExtender.java:254) ~[?:?]
+    at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$Tracked.customizerModified(BundleHookBundleTracker.java:500) ~[?:?]
+    at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$Tracked.customizerModified(BundleHookBundleTracker.java:433) ~[?:?]
+    at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$AbstractTracked.track(BundleHookBundleTracker.java:725) ~[?:?]
+    at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$Tracked.bundleChanged(BundleHookBundleTracker.java:463) ~[?:?]
+    at org.apache.aries.util.tracker.hook.BundleHookBundleTracker$BundleEventHook.event(BundleHookBundleTracker.java:422) ~[?:?]
+    at org.apache.felix.framework.util.SecureAction.invokeBundleEventHook(SecureAction.java:1179) ~[?:?]
+    at org.apache.felix.framework.EventDispatcher.createWhitelistFromHooks(EventDispatcher.java:730) ~[?:?]
+    at org.apache.felix.framework.EventDispatcher.fireBundleEvent(EventDispatcher.java:485) ~[?:?]
+    at org.apache.felix.framework.Felix.fireBundleEvent(Felix.java:4579) ~[?:?]
+    at org.apache.felix.framework.Felix.startBundle(Felix.java:2174) ~[?:?]
+    at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:998) ~[?:?]
+    at org.apache.felix.framework.BundleImpl.start(BundleImpl.java:984) ~[?:?]
+    at org.apache.karaf.features.internal.service.BundleInstallSupportImpl.startBundle(BundleInstallSupportImpl.java:161) ~[?:?]
+    at org.apache.karaf.features.internal.service.FeaturesServiceImpl.startBundle(FeaturesServiceImpl.java:1116) ~[?:?]
+    at org.apache.karaf.features.internal.service.Deployer.deploy(Deployer.java:997) ~[?:?]
+    at org.apache.karaf.features.internal.service.FeaturesServiceImpl.doProvision(FeaturesServiceImpl.java:1025) ~[?:?]
+    at org.apache.karaf.features.internal.service.FeaturesServiceImpl.lambda$doProvisionInThread$13(FeaturesServiceImpl.java:964) ~[?:?]
+    at java.util.concurrent.FutureTask.run(FutureTask.java:266) [?:?]
+    at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149) [?:?]
+    at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624) [?:?]
+    at java.lang.Thread.run(Thread.java:748) [?:?]
+Caused by: java.lang.RuntimeException: problem refreshing installed licences for karafInstance=localhost karafInstanceUrl=http://localhost:8980/opennms:
+    at org.opennms.features.pluginmgr.PluginManagerImpl.refreshKarafEntry(PluginManagerImpl.java:366) ~[?:?]
+    ... 53 more
+Caused by: java.lang.RuntimeException: getLicenceMap Failed : HTTP error code : 404
+    at org.opennms.karaf.licencemgr.rest.client.jerseyimpl.LicenceManagerClientRestJerseyImpl.getLicenceMap(LicenceManagerClientRestJerseyImpl.java:296) ~[?:?]
+    at org.opennms.features.pluginmgr.PluginManagerImpl.refreshKarafEntry(PluginManagerImpl.java:359) ~[?:?]
+    ... 53 more
+```
+
+Especially line `org.opennms.features.pluginmgr.PluginManagerImpl.refreshKarafEntry(PluginManagerImpl.java:359) ~[?:?]` is interesting.
+So we checkout the link:https://github.com/OpenNMS/osgi-plugin-manager[Plugin Manager] and debug into that link:https://github.com/OpenNMS/osgi-plugin-manager/blob/0f94d6c21641fac787609e6fddf9c33fe85d8237/org.opennms.plugin.pluginmanager/pluginmanager-core/src/main/java/org/opennms/features/pluginmgr/PluginManagerImpl.java#L359[line].
+
+
+Some investigation reveals, that as the exception already stated, a GET Request to URL `http://localhost:8980/opennms/licencemgr/rest/v1-0/licence-mgr/list` returns a `404 NOT FOUND`.
+
+First of all, this is bad, as the plugin manager is using Jersey `1.19` and not integrating with OpenNMS the correct way.
+The correct way, would be using the `jax-rs-connector` instead, which itself uses Jersey `2.22.2`. 
+Just to confirm this have a look at all installed jersey bundles:
+
+```
+admin@opennms> list | grep -i jersey
+ 68 │ Active   │  80 │ 2.22.2                  │ jersey-min
+ 83 │ Active   │  50 │ 1.19.3                  │ jersey-client
+ 84 │ Active   │  50 │ 1.19.3                  │ jersey-core
+ 85 │ Active   │  50 │ 1.19.3                  │ jersey-server
+ 86 │ Active   │  50 │ 1.19.3                  │ jersey-servlet
+```
+
+As this was always the case, I don't really want to mess with that.
+So how is it supposed to work?
+The Plugin Manager is exposing a `javax.servlet.Servlet` which is in fact a JerseyServlet in order to handle the JAX-RS annotated classes correctly.
+
+link:https://github.com/OpenNMS/osgi-plugin-manager/blob/c1977fc41886e05943b0579cce82a82bd0e74a3a/org.opennms.plugin.pluginmanager/licencemanager/src/main/resources/OSGI-INF/blueprint/blueprint.xml#L263-L273[Here] are the snippets responsible for that.
+
+```
+ <bean id="licenceManagerRestServlet" class="com.sun.jersey.spi.container.servlet.ServletContainer">
+    <argument ref="licenceManagerRestApplication" />
+  </bean>
+
+  <service interface="javax.servlet.Servlet" ref="licenceManagerRestServlet">
+    <service-properties>
+      <entry key="alias" value="/licencemgr/rest/v1-0" />
+    </service-properties>
+  </service>
+
+  <bean id="licenceManagerRestApplication" class="org.opennms.karaf.licencemgr.rest.impl.LicenceManagerRestApplication" destroy-method="destroyMethod" />
+```
+
+So let's see why this is no longer working.
+As I know the URL (`http://localhost:8980/opennms/licencemgr/rest/v1-0/licence-mgr/list`), let's grep for `licencemgr` in karaf.log:
+
+```
+2019-02-18T13:55:09,780 INFO  org.opennms.plugin.licencemanager:1.2.0(339) [FelixStartLevel] org.opennms.karaf.licencemgr.LicenceServiceImpl: Licence Manager licence file=/Users/mvrueden/dev/opennms/NMS-10539/target/opennms-24.0.0-SNAPSHOT/etc/pluginLicence     Data.xml does not exist. A new one will be created.
+2019-02-18T13:55:09,784 INFO  org.opennms.plugin.licencemanager:1.2.0(339) [FelixStartLevel] org.opennms.karaf.licencemgr.LicenceManagerController: Remote licence managers set to:'http://localhost:8181'
+2019-02-18T13:55:09,784 INFO  org.opennms.plugin.licencemanager:1.2.0(339) [FelixStartLevel] org.opennms.karaf.licencemgr.LicenceManagerController: Licence Manager Starting
+2019-02-18T13:55:09,784 INFO  org.opennms.plugin.licencemanager:1.2.0(339) [FelixStartLevel] org.opennms.karaf.licencemgr.LicenceManagerController: Licence Manager system set to not load remote licences
+2019-02-18T13:55:09,784 INFO  org.opennms.plugin.licencemanager:1.2.0(339) [FelixStartLevel] org.opennms.karaf.licencemgr.LicenceManagerController: Licence Manager Started
+```
+
+Yeah it is exposed via port 8181 which is the default port of the Karaf's `HttpService`. 
+This is really bad news, as it means our internal link:/posts/development/9-hindenburg-effect[Http Bridge] is no longer working.
+Verifying that it is actually correctly exposed at that location reveals *Everything Is Awesome*.
+icon:frown-o[].
+
+```
+% curl -v -X GET -u admin:admin http://localhost:8181/licencemgr/rest/v1-0/licence-mgr
+Note: Unnecessary use of -X or --request, GET is already inferred.
+*   Trying ::1...
+* TCP_NODELAY set
+* Connected to localhost (::1) port 8181 (#0)
+* Server auth using Basic with user 'admin'
+> GET /licencemgr/rest/v1-0/licence-mgr HTTP/1.1
+> Host: localhost:8181
+> Authorization: Basic YWRtaW46YWRtaW4=
+> User-Agent: curl/7.54.0
+> Accept: */*
+>
+< HTTP/1.1 405 Method Not Allowed
+< Date: Mon, 18 Feb 2019 13:07:15 GMT
+< Allow: OPTIONS
+< Content-Length: 0
+< Server: Jetty(9.4.z-SNAPSHOT)
+<
+* Connection #0 to host localhost left intact
+```
+
+Let's take a look at the exposed `HttpService`.
+
+```
+admin@opennms> service:list HttpService
+[org.osgi.service.http.HttpService, org.apache.felix.http.api.ExtHttpService]
+-----------------------------------------------------------------------------
+ service.bundleid = 213
+ service.id = 325
+ service.scope = bundle
+Provided by :
+ OpenNMS :: OSGi Container :: Web Servlet OSGi Bridge (213)
+Used by:
+ Vaadin Compatibility Themes (92)
+ Vaadin Server (95)
+ publisher (70)
+ Default Widgetset (88)
+ OpenNMS :: Features :: Vaadin :: Extender Service (304)
+ org.opennms.plugin.featuremanager (338)
+ OpenNMS :: Plugins :: Admin UI (352)
+ OpenNMS :: OSGi Container :: Web Servlet OSGi Bridge (213)
+ Vaadin Themes (97)
+ OpenNMS :: Features :: NRTG :: Web Interface (269)
+ org.opennms.plugin.licencemanager (339)
+ OPS4J Pax Web - Extender - Whiteboard (342)
+ Compatibility Widgetset (89)
+ Vaadin Shared (96)
+
+[org.osgi.service.http.HttpService, org.ops4j.pax.web.service.WebContainer]
+---------------------------------------------------------------------------
+ felix.fileinstall.filename = file:/Users/mvrueden/dev/opennms/NMS-10539/target/opennms-24.0.0-SNAPSHOT/etc/org.ops4j.pax.web.cfg
+ javax.servlet.context.tempdir = /Users/mvrueden/dev/opennms/NMS-10539/target/opennms-24.0.0-SNAPSHOT/data/pax-web-jsp
+ org.ops4j.pax.web.config.file = /Users/mvrueden/dev/opennms/NMS-10539/target/opennms-24.0.0-SNAPSHOT/etc/jetty.xml
+ org.ops4j.pax.web.enableCRLDP = false
+ org.ops4j.pax.web.enableOCSP = false
+ org.ops4j.pax.web.enc.algorithm = PBEWithMD5AndDES
+ org.ops4j.pax.web.enc.enabled = false
+ org.ops4j.pax.web.enc.prefix = ENC(
+ org.ops4j.pax.web.enc.suffix = )
+ org.ops4j.pax.web.jsp.check.interval = 300
+ org.ops4j.pax.web.jsp.debug.info = true
+ org.ops4j.pax.web.jsp.development = true
+ org.ops4j.pax.web.jsp.enable.pooling = true
+ org.ops4j.pax.web.jsp.ie.classid = clsid:8AD9C840-044E-11D1-B3E9-00805F499D93
+ org.ops4j.pax.web.jsp.java.encoding = UTF-8
+ org.ops4j.pax.web.jsp.keep.generated = true
+ org.ops4j.pax.web.jsp.log.verbosity.level = WARNING
+ org.ops4j.pax.web.jsp.mapped.file = false
+ org.ops4j.pax.web.jsp.precompilation = false
+ org.ops4j.pax.web.jsp.tagpool.max.size = 5
+ org.ops4j.pax.web.listening.addresses = 0.0.0.0
+ org.ops4j.pax.web.log.ncsa.append = true
+ org.ops4j.pax.web.log.ncsa.dispatch = false
+ org.ops4j.pax.web.log.ncsa.extended = true
+ org.ops4j.pax.web.log.ncsa.format = yyyy_mm_dd.request.log
+ org.ops4j.pax.web.log.ncsa.logtimezone = GMT
+ org.ops4j.pax.web.log.ncsa.retaindays = 90
+ org.ops4j.pax.web.session.cookie = JSESSIONID
+ org.ops4j.pax.web.session.cookie.secure = false
+ org.ops4j.pax.web.session.timeout = 5
+ org.ops4j.pax.web.session.url = jsessionid
+ org.ops4j.pax.web.ssl.clientauthneeded = false
+ org.ops4j.pax.web.ssl.clientauthwanted = false
+ org.ops4j.pax.web.ssl.keystore = .keystore
+ org.ops4j.pax.web.ssl.renegotiationAllowed = true
+ org.ops4j.pax.web.validateCerts = false
+ org.ops4j.pax.web.validatePeerCerts = false
+ org.ops4j.pax.webssl.cyphersuites.excluded = []
+ org.ops4j.pax.webssl.cyphersuites.included = []
+ org.osgi.service.http.connector.name = default
+ org.osgi.service.http.enabled = true
+ org.osgi.service.http.port = 8181
+ org.osgi.service.http.port.secure = 8443
+ org.osgi.service.http.secure.connector.name = secureDefault
+ org.osgi.service.http.secure.enabled = false
+ org.osgi.service.http.useNIO = true
+ service.bundleid = 345
+ service.id = 352
+ service.pid = org.ops4j.pax.web
+ service.scope = bundle
+Provided by :
+ OPS4J Pax Web - Runtime (345)
+Used by:
+ publisher (70)
+ OpenNMS :: Features :: Vaadin :: Extender Service (304)
+ org.opennms.plugin.featuremanager (338)
+ OpenNMS :: Plugins :: Admin UI (352)
+ OpenNMS :: OSGi Container :: Web Servlet OSGi Bridge (213)
+ OpenNMS :: Features :: NRTG :: Web Interface (269)
+ org.opennms.plugin.licencemanager (339)
+ OPS4J Pax Web - Extender - Whiteboard (342
+```
+
+Dödömm. Two services from different bundles (bundle id 213 and bundle id 345) are exposed, where only one should be.
+The service exposed by bundle id 213 is the correct one. 
+However Bundle 345 should not expose the same service again. 
+Let's see what the situation was before upgrading to Karaf 4.2.2.
+
+```
+admin@opennms> service:list HttpService
+[org.osgi.service.http.HttpService, org.apache.felix.http.api.ExtHttpService]
+-----------------------------------------------------------------------------
+ service.bundleid = 178
+ service.id = 311
+ service.scope = bundle
+Provided by :
+ OpenNMS :: OSGi Container :: Web Servlet OSGi Bridge (178)
+Used by:
+ OpenNMS :: OSGi Container :: Web Servlet OSGi Bridge (178)
+ OpenNMS :: Features :: NRTG :: Web Interface (234)
+ Compatibility Widgetset (79)
+ OpenNMS :: Features :: Vaadin :: Extender Service (269)
+ Vaadin Server (85)
+ Vaadin Shared (86)
+ publisher (60)
+ Default Widgetset (78)
+ OpenNMS :: Plugins :: Admin UI (316)
+ org.opennms.plugin.licencemanager (304)
+ Vaadin Themes (87)
+ Vaadin Compatibility Themes (82)
+ org.opennms.plugin.featuremanager (303)
+```
+
+Yep, only one `HttpService` beeing exposed.
+
+Just for comparison, let's see which pax related bundles and features are beeing installed/started.
+
+```
+admin@opennms> list | grep -i pax
+```
+
+Shows no pax bundle beeing started.
+
+```
+admin@opennms> feature:list -i | grep -i pax
+pax-jdbc-spec                           │ 1.0.1                 │          │ Started │ org.ops4j.pax.jdbc-1.0.1 │ Provides OSGi JDBC Service spec
+```
+
+Shows only one pax feature beeing started.
+
+
+Now Let's see what the situation is after the upgrade to Karaf 4.2.2.
+
+```
+admin@opennms> list | grep -i pax
+```
+
+No Pax related bundles are beeing started/installed. 
+So this is good news.
+
+
+```
+admin@opennms> feature:list -i | grep -i pax
+pax-web-core                            │ 7.2.5                 │          │ Started │ org.ops4j.pax.web-7.2.5  │ Provide Core pax-web bundles
+pax-jetty                               │ 9.4.12.v20180830      │          │ Started │ org.ops4j.pax.web-7.2.5  │ Provide Jetty engine support
+pax-http-jetty                          │ 7.2.5                 │          │ Started │ org.ops4j.pax.web-7.2.5  │
+pax-http                                │ 7.2.5                 │          │ Started │ org.ops4j.pax.web-7.2.5  │ Implementation of the OSGI HTTP Service
+pax-http-jetty                          │ 7.2.5                 │          │ Started │ standard-4.2.2           │
+pax-jdbc-spec                           │ 1.0.1                 │          │ Started │ org.ops4j.pax.jdbc-1.0.1 │ Provides OSGi JDBC Service spec
+```
+
+However a lot of pax-related features are beeing installed (this we already knew from link:/posts/karaf-upgrade/4.2.2/day1[Day 1]).
+If we were to prevent this, all of the existing exceptions should go away.
+
+At link:/posts/karaf-upgrade/4.2.2/day1[Day 1] we also learned that the features are installed due to the following dependency:
+
+```
+opennms-bridge-http-service -> pax-http -> pax-http-jetty -> pax-jetty
+```
+
+If the `opennms-bridge-http-service` is not installing `pax-http`, the all dependant features (except maybe `pax-web-core`) should no longer be installed.
+Let's do this by modifying the `opennms-bridge-http-service` and not install feature `pax-http`.
+
+TODO MVR add diff
+
+After a rebuild and restart of OpenNMS let's verify if that worked.
+
+```
+admin@opennms> list | grep -i pax
+```
+
+No Pax related bundles are beeing started/installed. 
+
+```
+admin@opennms> feature:list -i | grep -i pax
+```
+
+No pax related features are beeing started/installed.
+Even feature `pax-web-core` is gone.
+This is because `pax-http-jetty` also depends on `pax-web-core`.
+
+```
+admin@opennms> feature:info pax-http
+Feature pax-http 7.2.5
+Description:
+  Implementation of the OSGI HTTP Service
+Details:
+  Allows to publish servlets using pax web and jetty
+Feature has no configuration
+Feature has no configuration files
+Feature depends on:
+  pax-http-jetty [7.2,7.3)
+Feature has no bundles.
+Feature has no conditionals.
+admin@opennms> feature:info pax-http-jetty
+Feature pax-http-jetty 7.2.5
+Feature configuration:
+  org.ops4j.pax.web
+Feature has no configuration files
+Feature depends on:
+  scr 0.0.0
+  pax-jetty [9.3,10.0)
+  pax-web-core 0.0.0
+Feature contains followed bundles:
+  mvn:org.ops4j.pax.web/pax-web-runtime/7.2.5 start-level=30
+  mvn:org.ops4j.pax.web/pax-web-jetty/7.2.5 start-level=30
+Feature contains followed conditionals:
+Conditional(pax-keycloak) has no configuration
+Conditional(pax-keycloak) has no configuration files
+Conditional(pax-keycloak) depends on:
+  pax-keycloak-http-jetty 0.0.0
+Conditional(pax-keycloak) has no bundles.
+```
+
+A quick look at the `karaf.log` now shows a new issue:
+
+```
+org.apache.felix.resolver.reason.ReasonException: Unable to resolve root: missing requirement [root] osgi.identity; osgi.identity=internal-plugins-descriptor; type=karaf.feature; version="[24.0.0.SNAPSHOT,24.0.0.SNAPSHOT]"; filter:="(&(osgi.identity=internal-plugins-d    escriptor)(type=karaf.feature)(version>=24.0.0.SNAPSHOT)(version<=24.0.0.SNAPSHOT))" [caused by: Unable to resolve internal-plugins-descriptor/24.0.0.SNAPSHOT: missing requirement [internal-plugins-descriptor/24.0.0.SNAPSHOT] osgi.identity; osgi.identity=internal-plug    ins-descriptor; type=osgi.bundle; version="[24.0.0.SNAPSHOT,24.0.0.SNAPSHOT]"; resolution:=mandatory [caused by: Unable to resolve internal-plugins-descriptor/24.0.0.SNAPSHOT: missing requirement [internal-plugins-descriptor/24.0.0.SNAPSHOT] osgi.wiring.package; filte    r:="(osgi.wiring.package=org.opennms.karaf.productpub)" [caused by: Unable to resolve org.opennms.plugin.licencemanager/1.2.0: missing requirement [org.opennms.plugin.licencemanager/1.2.0] osgi.wiring.package; filter:="(osgi.wiring.package=org.ops4j.pax.web.extender.w    hiteboard.runtime)" [caused by: Unable to resolve org.ops4j.pax.web.pax-web-extender-whiteboard/7.2.5: missing requirement [org.ops4j.pax.web.pax-web-extender-whiteboard/7.2.5] osgi.wiring.package; filter:="(&(osgi.wiring.package=org.ops4j.pax.web.utils)(version>=7.2.    5))" [caused by: Unable to resolve org.ops4j.pax.web.pax-web-api/7.2.5: missing requirement [org.ops4j.pax.web.pax-web-api/7.2.5] osgi.wiring.package; filter:="(&(osgi.wiring.package=org.apache.xbean.finder)(version>=4.4.0)(!(version>=5.0.0)))" [caused by: Unable to r    esolve org.apache.xbean.finder/4.6.0: missing requirement [org.apache.xbean.finder/4.6.0] osgi.wiring.package; filter:="(&(osgi.wiring.package=org.objectweb.asm)(version>=6.0.0)(!(version>=7.0.0)))"]]]]]]
+```
+
+This is a big mess, but basically means, some bundle is missing some import.
+In this case bundle `org.apache.xbean.finder/4.6.0` cannot import classes from package `org.objectweb.asm` in version `>=6.0.0` but not `7.0.0`.
+
+Looking at our `standard.xml` feature defintion
+
+```
+ <!-- Copied out of PAX Web features.xml at mvn:org.ops4j.pax.web/pax-web-features/${paxWebVersion}/xml/features -->
+    <feature name="opennms-http-whiteboard" description="Provide HTTP Whiteboard pattern support" version="${opennms.osgi.version}">
+        <!-- <feature version="[6.0,6.1)">pax-http</feature> -->
+        <feature>opennms-bridge-http-service</feature>
+
+        <bundle dependency="true" start-level="20">mvn:org.ow2.asm/asm-all/5.0.2</bundle>
+        <bundle dependency="true" start-level="20">mvn:org.apache.xbean/xbean-bundleutils/4.6</bundle>
+        <bundle dependency="true" start-level="20">mvn:org.apache.xbean/xbean-reflect/4.6</bundle>
+        <bundle dependency="true" start-level="20">mvn:org.apache.xbean/xbean-finder/4.6</bundle>
+        <bundle start-level="30">mvn:org.ops4j.pax.web/pax-web-api/${paxWebVersion}</bundle>
+        <bundle start-level="30">mvn:org.ops4j.pax.web/pax-web-spi/${paxWebVersion}</bundle>
+        <bundle start-level="30">mvn:org.ops4j.pax.web/pax-web-runtime/${paxWebVersion}</bundle>
+        <!-- <bundle start-level="30">mvn:org.ops4j.pax.web/pax-web-jetty/${paxWebVersion}</bundle> -->
+
+        <bundle dependency="true" start-level="30">mvn:org.eclipse.jdt.core.compiler/ecj/4.5.1</bundle>
+        <bundle start-level="30" dependency="true">mvn:javax.el/javax.el-api/3.0.0</bundle>
+        <bundle start-level="30">mvn:org.ops4j.pax.web/pax-web-jsp/${paxWebVersion}</bundle>
+        <bundle start-level="30">mvn:org.ops4j.pax.web/pax-web-extender-whiteboard/${paxWebVersion}</bundle>
+    </feature>
+```
+
+reveals, that we install `org.ow2.asm/asm-all/5.0.2` which is not `>=6.0.0`.
+As the comment above states `Copied out of PAX Web features.xml at mvn:org.ops4j.pax.web/pax-web-features/${paxWebVersion}/xml/features`, we should take a look at that file and compare it with the current definition. 
+The definitions were not directly copied, but merged together.
+Finding the changes were a bit tedious, but mainly the wrong `asm` version aws dependet on.
+The complete diff can be found link:[here].
+
+Yet another rebuild and then we can see if that solved the issue.
+
+Let's verify if everything works properly:
+
+ - `./bin/opennms -v status` reveals everything running
+ - Connecting to the Karaf Console icon:check[]
+ - `curl -X GET -u admin:admin http://localhost:8980/opennms/rest/info` icon:check[]
+ - `curl -X GET http://localhost:8980/opennms` icon:check[]
+ - `curl -X -u admin:admin GET http://localhost:8980/opennms/rest/classifications` icon:check[]
+ - `curl -v -X GET -u admin:admin http://localhost:8980/opennms/licencemgr/rest/v1-0/licence-mgr/list` icon:remove[]
+
+So again, we are back at the PluginManager having issues.
+Some checks:
+
+- Only one `HttpService` is exposed icon:check[]
+- No pax related bundles or features are installed icon:check[]
+- Karaf Log showing correct exposure for licencemgr (8980 vs 8181) icon:remove[]
+
+Some investigation reveals, that only the logging says "Remote licence managers set to:'http://localhost:8181'".
+The actual code trying to connect, is using `http://localhost:8980/opennms` correctly.
+However, neither `http://localhost:8980/opennms/licencemgr/rest/v1-0/licence-mgr` nor `http://localhost:8181/licencemgr/rest/v1-0/licence-mgr` is reachable.
+We know, that the PluginManager is exporting a `javax.servlet.Servlet` to make it work.
+What if that is broken somehow?
+Let's real quick check a Vaadin Application, which uses the same mechanism, e.g. the Topology Map -> `Page Not Found`.
+The same is true for the other Vaadin Applications.
+So, somehow Servlets are no longer exposed correctly.
+Now we have to find out why that is.
+
+Debugging into our link:https://github.com/opennms/opennms/blob/4018b6700d7804a19734201c5f93fca47d63a838/container/bridge/src/main/java/org/opennms/container/web/felix/base/internal/service/HttpServiceImpl.java#L110[HttpServiceImpl] shows, that now OSGi Servlets are exposed properly. 
+
+Looking at the `karaf.log` more closely revealed the following Exception
+
+```
+ org.osgi.framework.BundleException: Activator start error in bundle org.ops4j.pax.web.pax-web-extender-whiteboard [321].
+     at org.apache.felix.framework.Felix.activateBundle(Felix.java:2290) ~[?:?]
+     at org.apache.felix.framework.Felix.startBundle(Felix.java:2146) ~[?:?]
+     at org.apache.felix.framework.Felix.setActiveStartLevel(Felix.java:1373) ~[?:?]
+     at org.apache.felix.framework.FrameworkStartLevelImpl.run(FrameworkStartLevelImpl.java:308) ~[?:?]
+     at java.lang.Thread.run(Thread.java:748) [?:?]
+ Caused by: java.lang.IllegalStateException: HttpService must be implementing Pax-Web WebContainer!
+     at org.ops4j.pax.web.extender.whiteboard.internal.ExtendedHttpServiceRuntime.serviceChanged(ExtendedHttpServiceRuntime.java:110) ~[?:?]
+     at org.ops4j.pax.web.extender.whiteboard.internal.ExtendedHttpServiceRuntime.serviceChanged(ExtendedHttpServiceRuntime.java:44) ~[?:?]
+     at org.ops4j.pax.web.extender.whiteboard.internal.util.tracker.ReplaceableService.bind(ReplaceableService.java:86) ~[?:?]
+     at org.ops4j.pax.web.extender.whiteboard.internal.util.tracker.ReplaceableService$Customizer.addingService(ReplaceableService.java:105) ~[?:?]
+     at org.osgi.util.tracker.ServiceTracker$Tracked.customizerAdding(ServiceTracker.java:941) ~[?:?]
+     at org.osgi.util.tracker.ServiceTracker$Tracked.customizerAdding(ServiceTracker.java:870) ~[?:?]
+     at org.osgi.util.tracker.AbstractTracked.trackAdding(AbstractTracked.java:256) ~[?:?]
+     at org.osgi.util.tracker.AbstractTracked.trackInitial(AbstractTracked.java:183) ~[?:?]
+     at org.osgi.util.tracker.ServiceTracker.open(ServiceTracker.java:318) ~[?:?]
+     at org.osgi.util.tracker.ServiceTracker.open(ServiceTracker.java:261) ~[?:?]
+     at org.ops4j.pax.web.extender.whiteboard.internal.util.tracker.ReplaceableService.start(ReplaceableService.java:72) ~[?:?]
+     at org.ops4j.pax.web.extender.whiteboard.internal.ExtendedHttpServiceRuntime.start(ExtendedHttpServiceRuntime.java:155) ~[?:?]
+     at org.ops4j.pax.web.extender.whiteboard.internal.Activator.start(Activator.java:98) ~[?:?]
+     at org.apache.felix.framework.util.SecureAction.startActivator(SecureAction.java:697) ~[?:?]
+     at org.apache.felix.framework.Felix.activateBundle(Felix.java:2240) ~[?:?]
+```
+
+Looking at all the installed/started bundles shows, that the `pax-whiteboard` bundle, responsible for the `Servlet` registration is missing.
+That seems to be different from the previous Karaf version, or maybe a change in the pax code.
+That is not clear at the moment.
+But without that bundle, the Http Whiteboard is not available, and no Servlets will be registered.
+Only those Servlets manually registered via `httpService.registerServlet(...)` are working.
+So I have to find out, how to fix this.
+As this probably means to replace our hacky bridge implementation, this is for another day.
