@@ -1,6 +1,6 @@
 ---
 title: "Upgrading Karaf to 4.2.2 - Day 13"
-date: 2019-03-06T17:00:00+01:00
+date: 2019-03-06T15:00:00+01:00
 tags: ["karaf", "osgi"]
 draft: false
 featured_image: "https://images.pexels.com/photos/261763/pexels-photo-261763.jpeg?auto=compress"
