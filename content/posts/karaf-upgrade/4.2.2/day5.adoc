@@ -4,7 +4,7 @@ title: "Upgrading Karaf to 4.2.2 - Day 5"
 date: 2019-02-20T12:00:00+01:00
 tags: ["karaf", "osgi"]
 draft: false
-featured_image: ""
+featured_image: "https://images.pexels.com/photos/73821/train-wreck-steam-locomotive-locomotive-railway-73821.jpeg?auto=compress"
 ---
 :icons: font
 
