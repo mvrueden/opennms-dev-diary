@@ -1,0 +1,48 @@
+---
+title: "Upgrading Karaf to 4.2.2 - Day 6"
+date: 2019-02-21T12:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: ""
+---
+:icons: font
+
+link:/posts/karaf-upgrade/4.2.2/day5[Yesterday] we started to to replace our custom Http Bridge with the official Http Felix Bridge.
+I started implementing a `ProxyFilter` to dispatch all requests to the OSGi world if it can be handled by any OSGi registered service to make `/opennms/topology` work instead of using `/opennms/osgi/topology`. 
+While finalizing this initial work, I encountered a problem that service properties supported by the `PAX WEB` project are not officially supported by OSGi and with that not supported by the `Apache Felix HTTP` project.
+
+Looking at the OSGi Http Specification revealed, that the property should be called `osgi.http.whiteboard.servlet.pattern` instead.
+
+That doesn't sound too bad.
+
+Simply replace all service properties `alias` with `osgi.http.whiteboard.servlet.pattern`, rebuild and let's see the result, by verifying the Topology Map, as most of our OSGi servlet services are Vaadin Servlets.
+
+But the Topology Map showed a 404. 
+
+Can't things just simply work.
+
+Debugging revealed, that the call is actually dispatched properly for the `/opennms/topology` request.
+
+This is good, as it should be dispatched.
+
+However, the OSGi world is determining that it cannot handle the request, thus resulting in a 404.
+Debugging the problem, showed that the `osgi.http.whiteboard.servlet.pattern` is behaving differntly than the `alias` key, as the name suggests. 
+
+So instead of `/topology`, the `osgi.http.whiteboard.servlet.pattern` should be `/topology/*` in order to handle Topology Map related calls properly. 
+
+In order to make this work properly, I had to also adjust the `ProxyFilter` to encounter for wildcards in the pattern.
+This also affected the `Pax Vaadin` components (we forked), but was simply to fix.
+
+After some tweaks, it finally worked.
+
+image::/posts/karaf-upgrade/4.2.2/vaadin-kinda-works.jpeg[Topology Map Broken]
+
+Okay kinda (-:
+
+Beside this, all OSGi ReST requests were also working, such as `/rest/classifications`.
+
+Yay, at least some progress `\o/`
+
+It seems that somehow Vaadin is not working anymore.
+Trying other Vaadin UIs showed the same problem.
+But this is a story for another day.

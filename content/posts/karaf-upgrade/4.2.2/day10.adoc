@@ -1,0 +1,54 @@
+---
+title: "Upgrading Karaf to 4.2.2 - Day 10"
+date: 2019-02-28T17:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: ""
+---
+:icons: font
+
+Yesterday we spend all day fiddling with our `KarafTestCases` and finally disabled them.
+Today I thought we were going to fix some of our failed Smoke Tests, but instead we are going to do something different.
+
+Looking at the docker containers build for our System Tests, I encountered the following exception in the karaf.log.
+
+```
+Caused by: java.lang.IllegalArgumentException: Not supported: 
+http://javax.xml.XMLConstants/property/accessExternalDTD
+```
+
+Consulting the Oracle pointed me to a topic on the link:http://karaf.922171.n3.nabble.com/Error-opening-blueprint-xml-url-quot-when-deploying-blueprint-file-on-custom-distribution-Karaf-4-2--td4054957.html#a4054993[Karaf Mailing List].
+There it states, that the problem is fixed in Apache Karaf 4.2.3
+
+```
+Hi, 
+
+Yes, it's fixed on the coming 4.2.3 release. 
+
+I plan to submit Karaf 4.2.3 to vote this week. 
+
+If you can't wait, you can use 4.2.3-SNAPSHOT. I won't be easy on 4.2.2 
+because it's a fix on the code (not configuration). 
+
+If you are really on a rush, please ping me directly, I can provide 
+"custom" patched version of jar. 
+
+Regards 
+JB 
+```
+
+When starting the Karaf Upgrade `4.2.3` was still in Development and not yet released.
+
+Luckily, Updating Karaf takes a lot of time and effort, so Karaf `4.2.3` was already released \o/
+
+So the rest of the day I spend upgrading from `4.2.2` to `4.2.3`
+
+As a result I also created an "How to Upgrade Karaf" icon:share-square-o[link="https://opennms.discourse.group/t/how-to-upgrade-apache-karaf/259", window="_blank"] topic in our Discourse.
+
+After Updating to `4.2.3` the original Exception was gone, but now I could no longer log into the Karaf Shell.
+There are several reasons for this:
+
+- I changed the default ssh role from `admin` to `ssh` but forgot to populate that change to the `users.properties` as well (true for all containers)
+- We implement a custom `LoginModule` which inherits from `AbstractKarafLoginModule`. In Karaf 4.2.3 there is now a different implementation/Behaviour expected, which we did not implement. Applying link:https://github.com/OpenNMS/opennms/commit/88a60dcbbfc2d5cf74db1cf09722e083955607e1[this patch] solved that issue as well.
+
+Again I pushed my changes and will see what else is broken.

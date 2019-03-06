@@ -1,0 +1,86 @@
+
+---
+title: "Upgrading Karaf to 4.2.2 - Day 5"
+date: 2019-02-20T12:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: ""
+---
+:icons: font
+
+link:/posts/karaf-upgrade/4.2.2/day4[Yesterday] I found out, that we can no longer use our forked Http Service Bridge.
+This is good for once, as we can now finally get rid of it.
+But on the other hand this, will be a lot of work.
+So let's get started.
+
+## Which version to use
+
+As we can no longer use the `pax-whiteboard` bundle as we used to, we have to find another solution.
+I asked the Oracle and found out, that the link:http://felix.apache.org/documentation/subprojects/apache-felix-http-service.html[Apache HTTP Felix] project provides a "Bridge Mode" which may solve our issue.
+
+But first I had to find out which version to use. 
+I ended up using version link:https://mvnrepository.com/artifact/org.apache.felix/org.apache.felix.http.bridge/3.0.0[3.0.0], mainly because it matched the `felixVersion` property we already used in OpenNMS and it supports the `HTTP Whiteboard Pattern`, which is the reason why we have to do this in the first place.
+
+## Back to the Roots
+
+I decided to try out the "Bridge Mode" first in an isolated enviroment in order to better understand how it is supposed to work.
+Refering to the documentation it states:
+
+```
+Using the Servlet Bridge
+
+The servlet bridge is used if you want to use the HTTP service inside a WAR deployed on a 3rd part applicaiton server. 
+A little setup is needed for this to work:
+
+- deploy org.apache.felix.http.proxy jar file inside the web application (WEB-INF/lib); 
+- in a startup listener (like ServletContextListener) set the BundleContext as a servlet context attribute (see example);
+- define org.apache.felix.http.proxy.ProxyServlet inside your web.xml and register it to serve on all requests /* (see example);
+- define org.apache.felix.http.proxy.ProxyListener as a <listener> in your web.xml to allow HTTP session related events to be forwarded (see the section of Servlet API Event forwarding below and example);
+- be sure to add javax.servlet;javax.servlet.http;version=2.6 to OSGi system packages (org.osgi.framework.system.packages);
+- deploy org.apache.felix.http.bridge (or org.apache.felix.http.bundle) inside the OSGi framework.
+```
+
+This doesn't sound too complicated.
+
+Basically we need to forward some HTTP Requests from Jetty to OSGi.
+For this we use the `ProxyServlet` and forward it to, e.g. `/osgi`, defined in a `web.xml`. 
+The `ProxyListener` is used to forward Session related events.
+
+So I created a new plain maven Webapp project and followed the instructions from above.
+This resulted in a Webapp with a `WebAppListener` which starts Apache Karaf at some point during Jetty's startup process.
+
+This resulted in a setup where custom `javax.servlet.Servlet` services could be registered via OSGi and was served by the Jetty.
+
+This looked almost identical to what we have in OpenNMS now.
+See link:https://github.com/OpenNMS/opennms/blob/c596f65962945f0af47fe82c022dae3b8fdfd9b9/container/servlet[container/servlet] in OpenNMS for more details.
+
+## Apply this to OpenNMS
+
+The integration with OpenNMS was simple.
+I just replaced our custom bundle, with the official felix jar in link:https://github.com/OpenNMS/opennms/pull/2380/commits/4869f128d34ad17f7d8adcce7080abc3249f1d26[4869f128d34ad17f7d8adcce7080abc3249f1d26].
+
+However I learned pretty quickly why we originally forked the `Apache Felix HTTP Bridge`.
+The problem I encountered was, that with the `ProxyServlet` a designated path must be assigned for all OSGi related HTTP Requests, e.g. `/osgi`. 
+We have that in place, but block them all in the link:https://github.com/OpenNMS/opennms/blob/be646765639d9d1928c1b30cff452838199b8285/opennms-webapp/src/main/webapp/WEB-INF/applicationContext-spring-security.xml#L149[spring-security configuration].
+Besides that, some applications are directly accessed without the `/osgi` prefix, like the Topology Map: `/opennms/topology`.
+However it should be something like `/opennms/osgi/topology`.
+In order to make this work, we created a `ProxyFilter` to dispatch all related requests to OSGi, or handle them via Jetty.
+But to implement this reliably, access to the "Http Bridge Code" is required. 
+And that is probably the reason why it was forked in the first place.
+
+However, I did not want to follow this path, so I decided to follow a more "OSGi friendly" approach.
+I decided to stick with the `ProxyFilter` approach for now.
+The goal of the `ProxyFilter` is to dispatch requests to the "OSGi world" if necessary, otherwise follow the Jetty path.
+In order to do this, the filter must know which requests the "OSGi world" can process.
+As we cannot hook into the `Apache Felix Http Code` anymore, I decided to just listen for all `javax.servlet.Servlet` services.
+This allows us to only forward those requests which can be handled by OSGi. 
+
+Besides listening to `javax.servlet.Servlet` it is required to also dispatch all requests to `/rest/classifications`, `/rest/flows`, `rest/datachoices`, as those are also handled by OSGi, but don't have a dedicated `javax.servlet.Servlet` registered. 
+The link:https://github.com/opennms/opennms/commit/83c42517d94b47a4c58ef00a434d9ecd75da1f81[first implementation] simply hardcoded those URLs and dispatched if the URL started with those strings.
+
+After doing this, everything should at least somehow work, but it didn't.
+Another problem I encountered was, that the `PAX HTTP implementation` seem to use different service properties.
+For example all `javax.servlet.Servlet` services were originally registered with an `alias` key to define the servlet path, e.g. `alias=/topology`. 
+However, the official OSGi specification define different propeties. 
+With that the `Http Apache Felix` service does not support the `alias` service property.
+But this is for another day.

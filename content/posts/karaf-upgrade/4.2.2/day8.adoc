@@ -1,0 +1,37 @@
+---
+title: "Upgrading Karaf to 4.2.2 - Day 8"
+date: 2019-02-26T12:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: ""
+---
+:icons: font
+
+link:/posts/karaf-upgrade/4.2.2/day7[Yesterday] we learned, that Vaadin UIs are no longer working as they should.
+The sympthoms were that the first Vaadin UI you visited were always presented to you, no matter which one you accessed afterwards.
+
+My first finding was, that this is caused by the way Vaadin implements the `@PreserveOnRefresh` functionality.
+See link:https://issues.opennms.org/browse/NMS-10601[NMS-10601] for more details.
+However after I addressed/fixed that issue, the problem was not.
+
+Debugging some more showed, that only one `OsgiUIProvider` was present in the `VaadinSession`, but multiple should be.
+For each `ApplicationFactory` (representing a Vaadin UI) should add an `OsgiUiProvider` to each user session on initialization of the session. 
+However with the new Apache Felix Http Bridge, the `SessionInitListener` was only invoked once, thus resulting in only one `OsgiUIProvider`. 
+I compared the behaviour with the original version (without Apache Felix Bridge, but our own implementation), the behaviour was somewhat identical. Each `VaadinSession` also only had one `OsgiUiProvider` but somehow always had the right one internally assigned. I couldn't figure out why it actually worked, but it shouldn't.
+
+Looking at the `com.vaadin.server.UIProvider` class and some implementations it was clear to me, that it is can handle the creation of multiple UIs. With that information I refactored the `Vaadin Extender Service` to use only one `OsgiUiProvider` instead of one fore each `ApplicationFactory` to handle UI Creation. link:https://github.com/OpenNMS/opennms/pull/2380/commits/5ce82d5fa9e8e20b32ca7a93f4a3eecffb3975b8[Here] are the changes I applied.
+
+And it actually worked. `\o/`.
+
+I pushed my changes and let's see tomorrow how much is actually broken :)
+
+### For clarification
+
+The issue described in link:https://issues.opennms.org/browse/NMS-10601[NMS-10601] is still a problem, but neglectable for the most part. 
+The only UI as of now using `@PreserveOnRefresh` is the Topology UI. 
+A unique identifier to decide which UI to refresh, the web site's `window.name` is used. 
+If not defined, a random one is generated. 
+As the Topology UI is not loaded in an iframe, the `window.name` would not be accurate, but be defined and therefore the previous state would be reloaded.
+Only if a Vaadin UI in the future wants to preserve the state on a refresh and is embedded via an iframe it will never work. Therefore the problem was addressed.
+
+Also any Vaadin UI not anymore valid (due to new UI creation) will be closed, which cleans up the user sessions properly by Vaadin and does not need any actions on our side.

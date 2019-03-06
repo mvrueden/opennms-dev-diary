@@ -1,0 +1,25 @@
+---
+title: "Upgrading Karaf to 4.2.2 - Day 4"
+date: 2019-02-19T12:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: ""
+---
+:icons: font
+
+link:/posts/karaf-upgrade/4.2.2/day3[Yesterday] I learned, that the `pax-whiteboard` bundle is no longer starting.
+Investigating the issue some further revealed, that when activating the bundle an Exception `java.lang.IllegalStateException: HttpService must be implementing Pax-Web WebContainer!` is thrown. 
+This is a known issue (with OpenNMS), but before Karaf 4.2.2 it just worked.
+My guess is, that the Exception was triggered AFTER the bundle was started. 
+However now this happens when the bundle is still starting and therefore failing. 
+
+This may not sound like a lot, but it took me the whole day to figure this out.
+Here is my comment from the OpenNMS Dev Channel about it (mvrueden, 19th of Februrary 2019, 19:46 CET):
+
+> It seems that with karaf 4.2.2 our bridge is no longer working the way we use it at least. 
+  The main problem here is, that when the whiteboard pattern bundle is started, the Activator bails with an exception which stopps the bundle. 
+  This behaviour differs from our current state. 
+  The reason may be a new implementation in Bundle Activators in Karaf 4.2.2 or in preperation to make it more OSGI 7 compatible. 
+  Or may be a change in the new pax-web code (which also changed). 
+  I have to dive in deeper to find a solution. Probably use Felix instead of pax
+
