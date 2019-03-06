@@ -1,0 +1,12 @@
+---
+title: "Upgrading Karaf to 4.2.2 - Day 12"
+date: 2019-03-05T17:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: ""
+---
+:icons: font
+
+
+Today I spend half of the day documenting the adventure of Updating Karaf to Version 4.2.2/4.2.3.
+

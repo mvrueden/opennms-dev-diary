@@ -1,0 +1,51 @@
+---
+title: "Upgrading Karaf to 4.2.2 - Day 12"
+date: 2019-03-05T17:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: ""
+---
+:icons: font
+
+I thought with all the issues I already fixed, now everything should work again.
+
+NOPE.
+
+Bamboo is telling me that `NxosTelemetryIT` is no longer working.
+Okay, that is easy to reproduce with link:https://github.com/mvrueden/scripts/blob/master/opennms/system-tests.sh[my system-test.sh] script, inspired by some version from Jesse White.
+
+Running the script with the Bamboo URL to the build, e.g.
+
+```
+/system-tests.sh https://bamboo.opennms.org/browse/OPENNMS-ONMS2773-14
+```
+
+as an argument will download the RPMs and build the same docker images as Bamboo would.
+
+Afterwards I can run the failing smoke test
+
+```
+mvn clean verify -Dorg.opennms.smoketest.docker=true -Dsmoke=true -Dorg.opennms.smoketest.docker.skipTearDown=true -Dorg.opennms.smoketest.docker.useExisting=false -Dorg.opennms.smoketest.webdriver.use-chrome -D"chrome.path=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" -DskipITs=false -Dit.test=NxosTelemetryIT -Dorg.opennms.advertised-host-address=192.168.1.16
+```
+
+Setting `skipTearDown=true` keeps the Docker Container after the tests ran and allows me to debug into them.
+
+Logging in to the Minion reveals that the `UdpListener` is not started as it should.
+
+Playing around with the `config:edit` command revealed, that Karaf is not detecting the changes made there by the `ListenerManager` wich implemetns a `ManagedServiceFactory`.
+
+I eventually ended up creating issue link:https://issues.apache.org/jira/browse/KARAF-6181[KARAF-6181] just to find out later, that the usage of the command `config:edit` in combination with a `ManagedServiceFactory` has changed.
+
+Instead of using
+
+```
+config:edit <pid>-<alias>
+```
+
+```
+config:edit --factory <pid> --alias <alias>
+```
+
+should be used.
+
+And yet another issue solved \o/
