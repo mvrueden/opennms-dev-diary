@@ -9,3 +9,53 @@ featured_image: "https://images.pexels.com/photos/261763/pexels-photo-261763.jpe
 
 Today I spend half of the day documenting the adventure of Updating Karaf to Version 4.2.2/4.2.3.
 
+Besides that a bunch of `KarafTestCaseITs` were still failing.
+As the issue is not solvable for now I decided to `@Ignore` them.
+
+Another issue is, that some of the system tests, e.g. `HealthCheckIT` fail on Bamboo, but pass locally on my system.
+Usually if something fails on Bamboo it can be reproduced locally and then fixed.
+As this was not the case, debugging made it much harder.
+
+Looking at the `karaf.log` entries from the containers, revealed for the OpenNMS container that some features.xml file cannot be resolved:
+
+```
+Error resolving artifact org.apache.karaf.features:enterprise:xml:features:4.2.3
+```
+
+Verifying the content of the `system` directory confirms this.
+Simply add the `enterprise` repository and feature to the `karaf-maven-plugin` in the `pom.xml` of the `opennms-full-assembly` project and when building the system directory will be populated containing the missing `features.xml`.
+
+I doubt that fixing this, will also fix the failing system tests.
+Looking into the logs of the bamboo build indicates an issue when connecting to the Karaf Shell:
+
+```
+2019-03-06 06:55:06,308 ERROR [pool-1267-thread-1] org.opennms.test.system.api.NewTestEnvironment - Failed to reach the Minion from OpenNMS.
+	com.jcraft.jsch.JSchException: Session.connect: java.net.SocketException: Connection reset
+		at com.jcraft.jsch.Session.connect(Session.java:558)
+		at com.jcraft.jsch.Session.connect(Session.java:183)
+		at org.opennms.test.system.api.utils.SshClient.openShell(SshClient.java:93)
+		at org.opennms.test.system.api.NewTestEnvironment.canMinionConnectToOpenNMS(NewTestEnvironment.java:1049)
+		at org.opennms.test.system.api.NewTestEnvironment.lambda$waitForMinions$13(NewTestEnvironment.java:1041)
+		at com.jayway.awaitility.core.CallableCondition$ConditionEvaluationWrapper.eval(CallableCondition.java:100)
+		at com.jayway.awaitility.core.ConditionAwaiter$ConditionPoller.run(ConditionAwaiter.java:179)
+		at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511)
+		at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+		at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+		at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+		at java.lang.Thread.run(Thread.java:748)
+```
+
+This indicates that somehow a ssh connection cannot be established. 
+The same is true for Sentinel.
+This explains, why the tests are failing.
+As we already fixed a bunch of these issues, which were related, this should not occur and should work.
+Especially as this is now working locally.
+
+This is fishy.
+
+As there is nothing I can do locally, I disabled a bamboo agend logged in to it and build the docker images (with the magic `system-test.sh` script).
+The `HealthCheckIT` afterwards failed due to the same issue.
+Debugging some more, revealed that the Minion does not start the Karaf Container properly.
+As this is a Bamboo Agent issue, there is not much I can actually do.
+We resetted the docker daemon and restarted the machines.
+Afterwards it worked again.
