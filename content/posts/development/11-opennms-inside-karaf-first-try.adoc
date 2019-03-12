@@ -1,0 +1,90 @@
+---
+title: "Running OpenNMS inside Karaf - Some Thoughts"
+date: 2019-03-12T10:00:00+01:00
+tags: [development", "refactoring"]
+draft: false
+featured_image: "https://images.pexels.com/photos/531446/pexels-photo-531446.jpeg?auto=compress"
+---
+
+The other day I found my self in the lucky position to upgrade Karaf to a newer version.
+While doing that I also wrote something about our link:/posts/development/9-hindenburg-effect/[Http Bridge] and why it was not be the best decision to integrate Karaf inside Jetty instead of the other way around.
+
+While implementing the Upgrade I asked my self how hard could it be to get some components of now running from within Jetty to running in Karaf.
+
+## BSM Daemon
+
+I started with getting the BSM Daemon to load inside Karaf, as that requires a lot of components, but shouldn't be too hard.
+And as it turned out, it was not.
+I used a plain Sentinel container and started newly defined features, which I just put into `features-sentinel.xml`.
+The only issue I encountered was, that for Bsmd, the Eventd must be available as it exposes all of the event related services (e.g. `EventIpcManager`).
+
+## Event Daemon
+
+The Eventd turns out to be a bit more tricky.
+For now I was able to hack it, but the main problem here is, that there is no nice distinction between API and Implementation.
+There exists multiple modules, depending on each other and therefore all libraries must be loaded or none of them will work.
+As we now also expose services, via eclipse gemini, this may work in a container, running OpenNMS but will most likely fail when running inside Sentinel/Minion.
+
+With that working, Eventd and Bsmd came up (after some more tweaks).
+Mostly importing the right OSGi services, as now there is no big classpath anymore.
+
+## BSM Admin UI
+
+Next I thought, how hard would it be to load the BSM Admin UI, as this is also very isolated.
+Here the main issue was to get the default http implementation to work with a plain Karaf.
+Mainly you should not use `alias` and `osgi.http.whiteboard.servlet.pattern`.
+After I fixed that and with some more minor adjustments, the UI came up.
+
+## Topology UI
+
+Okay, if that is working, how hard could it be to load the Topology UI to get the links to `View in Topology UI` working.
+The TopologyUI requires a lot of services to be present, so this was much harder.
+The `OnmsHeaderProvider` which requires a Spring Web MVC project (NavbarController), which we don't have at this point.
+Also the topology loads all SVGs directly from the `${opennms.home}/jetty-webapps/svg` directory, which we don't have.
+For now I made it work, but icons aren't showing (obviously). This should probably be implemented as a `SVGService` and provide those from a dedicated directory instead. 
+
+Besides this, I had to start a few bundles, which were usually provided by the Jetty lifecycle.
+This may involved migrating some jar's to bundles.
+
+I also had to pull in `opennms.properties` as a lot of bundles just require them to be present.
+
+The most tricky part was to get the dao related classes and services working.
+This was mainly due to an issue on how sentinel is using them at the moment, which is not correct and just happends by accident.
+The main issue here is, that we are using hibernate 3.6 and hibernate in general requires all classes to be present in the current classpath in order to build the "Persistence Context".
+We on the other hand have split all of the Dao-related classes in multiple places:
+
+ - opennms-dao-api
+ - opennms-model
+ - opennms-dao
+
+And besides this, some features (e.g. topology, bsm) provide more daos and persistence related classes.
+For Sentinel we build a big `distributed.dao-api` and `distributed.dao-impl` module, containing all DAOs and those implementations.
+However when I started those in a plain container a lot of issues arose (which weren't seen in sentinel before).
+The `.dao-impl` module also contained all the `.dao-api` classes, but now both modules export the same packages in the same version. 
+Somehow this works in sentinel, but when I played with it, it did not work anymore.
+For now i simply emptied out the `.dao-api` module and put everything in `.dao-impl` (and fixed some issues with that strucure).
+However I am suspecting that there are more hibernate related issues burried.
+
+As all of this worked, I was finally able to see something pop up in the ui, but with a lot of exceptions.
+I copied over some of the topology related config files, which solved some of the issues.
+I decided to stop here, as now I needed to get `linkd` running in a container.
+
+## Summary
+
+Now it is more likely to get OpenNMS converted to a plain Karaf Container.
+However there is still some ground work which needs to be addressed before we can finally make that happen:
+
+- The config modules and config related classes (e.g. EventConfDao) must be reorganized to be more OSGi friendly, e.g. `config-api`, `config-impl`. The probably best approach is to have various config api and implementations for different services, e.g. events, snmp, etc. As sentinel is already using some configuration classes, it must be encountered for the fact that a container may not have access to `${opennms.home}/etc`.
+
+- We are able to consume some of our DAOs via Sentinel and that seems to work. 
+  However I am not sure if with the differentiation of a `opennms-dao-api` and `opennms-dao` module, where the last also contains the classes from the first, will work in the end. OSGi may be resolving the classes from the wrong bundle due to same Package Exports. If everything is bundled in one bundle, we must ensure if this is possible (e.g. for Minion)
+
+- In a lot of places we depend on `opennms-web-api`, which in this form can no longer be used.
+
+- Everything in core.soa is most likely to be removed
+
+- For the prototype I just manually started the features, but in the end we need some kind of "daemon-starter" in order to allow enabling/disabling daemons and probably honor some kind of `service-configuration.xml`.
+
+- Almost all daemons should be running in a container, before we can even try starting the webapp.
+
+The working branch can be found link:https://github.com/OpenNMS/opennms/tree/mvr/karaf-bsm-daemon[here].
