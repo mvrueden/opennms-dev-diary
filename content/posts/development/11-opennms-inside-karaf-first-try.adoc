@@ -91,4 +91,9 @@ However there is still some ground work which needs to be addressed before we ca
 - The eclipse gemini project is great and allows us to use spring within osgi in a very convinient way. 
   However it has one big disadvantage: The bundle is `ACTIVE` but if something spring-related or gemini-related is failing, there is no easy way of finding the issue, as the bundle is still `ACTIVE`. We have to find a better way of visualizing those issues (maybe with a `HealthCheck`).
 
+- Converting the tests should be investigated. 
+  As with a pure OSGi solution and if we continue to use eclipse gemini, the Spring Application Context of each bundle is now isolated from the context of other bundles and therefore each Application Context must import the required service dependencies via `osgi:reference`, in order to have them available for `@Autowired` or other use. 
+  The tests however require this big single Application Context. 
+  With everything OSGi we probably need to switch over to something like PAX Exam, which most likely means rewrite/migrate all the tests.
+
 The working branch can be found link:https://github.com/OpenNMS/opennms/tree/mvr/karaf-bsm-daemon[here].
