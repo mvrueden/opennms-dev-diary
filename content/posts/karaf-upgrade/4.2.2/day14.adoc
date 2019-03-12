@@ -1,0 +1,21 @@
+---
+title: "Upgrading Karaf to 4.2.2 - Day 14 - Alles wird gut"
+date: 2019-03-07T15:00:00+01:00
+tags: ["karaf", "osgi"]
+draft: false
+featured_image: "https://assets.aucklandzoo.co.nz/assets/media/kiwi-happy-held-hero.jpg"
+---
+:icons: font
+
+Yesterday we encountered the issue, that the docker image build by Bamboo was not able to run on the agent itself, but locally did.
+As with docker this should not happen, so we have to investigate.
+
+It turns out, that some of our JAXB dependencies we put into `${karaf.home}/lib` fail while loading.
+Simply link:https://github.com/OpenNMS/opennms/pull/2380/commits/ef5f0ad955bb1104abc864e29b623f3c9238fdb9[removing] them link:https://bamboo.opennms.org/browse/OPENNMS-ONMS2773-18[solved] at least the Smoke Test failures.
+
+The last test failing, is probably a flapper.
+
+So in the end "Alles wird gut" turns out to be true.
+
+
+[small]#Image by link:https://www.aucklandzoo.co.nz/experiences/kiwi-experience[Auckland Zoo New Zealand]#
