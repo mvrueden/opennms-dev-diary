@@ -1,52 +1,28 @@
 ---
-title: "Compiling OpenNMS"
-date: 2019-01-20T13:29:25+01:00
+title: "Compiling OpenNMS from Source"
+date: 2019-05-19T13:29:25+01:00
 tags: ["compiling", "development"]
-draft: true
-featured_image: ""
+draft: false
+featured_image: "https://images.pexels.com/photos/159298/gears-cogs-machine-machinery-159298.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
 ---
+:icons: font
 
-## Prerequirements
+This article describes how to compile OpenNMS from source.
+If you have not set up your environment properly, please see link:/posts/development/0-dev-environment-macos[here].
 
-In order to compile OpenNMS at least the following requirements should be met:
+# Checkout the Code
 
-1. The latest JDK should be installed. (At the moment OpenNMS does not compile with a java version greater than 9, this may change in the future)
-1. nsis
-1. cloned github opennms repository
+First of all, the code should be checked out.
+I usually do this in my `~/dev` directory:
 
+`git clone https://github.com/OpenNMS/opennms.git`
 
-## Optional Requirements
+This will create an `opennms` directory in `~/dev/opennms`.
+Next cd into it: `cd opennms`.
 
-1. PostgreSQL server should be available (not for compiling, but for starting afterwards) 
-1. Jicmp, jicmp6
-1. maven
+# Build from Source
 
-## Building
-
-OpenNMS uses Maven as a build tool and is split in 2 basic modules:
-
-1. parent/root modules
-2. opennms-full-assembly 
-
-Usually when building all mvn goals must be run against those two modules.
-In order to make live easier, there are various help scripts available. 
-
-Simplified explanation:
-
- - clean.pl -> Invokes `mvn clean` and `mvn clean -F opennms-full-assembly`
- - compile.pl -> Compiles the root module (Invokes a `mvn install` on the root module)
- - assemble.pl -> Builds the final assembly (opennms-<version>.tar.gz) (Invokes a `mvn install -F opennms-full-assembly`)
-
-Each script (except clean.pl) requires some arguments in order to configure OpenNMS correctly for later deployment.
-
-## Full build
-
-`cd ~/dev/opennms`
-`./clean.pl`
-./compile.pl -DskipTests` # Tests should not be executed
-`./assemble.pl -DskipTests` # Tests should not be executed, may provide -Dopennms.home if you want to deploy it somewhere else then `~/dev/opennms/target/opennms-<version>`
-
-## How I Build
+## TL;DR
 
 Regular development
 ```
@@ -57,3 +33,100 @@ When Deploying it somewhere else than locally on my machine
 ```
 time (./clean.pl && ./compile.pl -DskipTests && ./assemble.pl -Dopennms.home=/opt/opennms -DskipTests); say "OpenNMS may be ready for deployment"
 ```
+
+## Detailled explanation
+
+The build of OpenNMS is usually split into 3 phases: 
+ 
+ - clean.pl -> Removes all previously build artifacts/archives 
+ - compile.pl -> Compiles the root module
+ - assemble.pl -> Builds the final assembly `opennms-<version>.tar.gz` 
+
+Behind the scenes OpenNMS uses link:https://maven.apache.org[Maven] as a build tool.
+The above scripts roughly translate to the following actions:
+
+ - clean.pl -> invokes `mvn clean` and `mvn clean -F opennms-full-assembly`
+ - compile.pl -> invokes a `mvn install` on the root module
+ - assemble.pl -> invokes a `mvn install -F opennms-full-assembly`
+
+Each script has various numbers of arguments and options, which you can show with `-h`
+
+### Full build (step by step)
+
+First navigate to your local git repository
+
+`cd ~/dev/opennms`
+
+Ensure you are on the desired branch (e.g. develop)
+
+`git status` 
+
+Now do a full build with the following command
+
+```
+./clean.pl && ./comppile.pl -DskipTests && ./assemble.pl -DskipTests -p dir
+```
+
+This will build OpenNMS from source (no tests are executed) and will place all files and directories to `~/dev/opennms/target/opennms-<current-version>`.
+
+If you want an archive instead, simply omit the `-p dir` option
+
+If you want another `opennms.home` directory, simply define it in the assembly step: `./assemble.pl -DskipTests -Dopennms.home=/opt/opennms -p dir`.
+
+icon:exclamation-triangle[] Please keep in mind, that if you are building the first time, this may take several hours, because a lot of dependencies must be downloaded.
+
+## Running OpenNMS after compilation
+
+After OpenNMS built from Source successfully it must be configured before it can be started.
+
+First configure java:
+
+`./bin/runjava -s` 
+
+and afterwards initialize/update the database:
+
+`sudo ./bin/install -dis`
+
+Pro Tip:
+In case you are working on an OSGi bundle it is recommend to link the root user's `.m2/repository` directory to the user you build OpenNMS with.
+This enables you to use the `bundle:watch` command or manually install missing bundles, which are not located in the `system` directory. 
+
+```
+> sudo su
+> mkdir ~/.m2
+> cd ~/.m2
+> ln -s /home/<user>/.m2/repository repository
+```
+
+Now OpenNMS can be started (i.e. with the -t option to enable the remote debugger):
+
+```
+sudo ./bin/opennms -vt start
+```
+
+The WEB UI should come up after some time at `http://localhost:8980/opennms`.
+
+### How I Build
+
+Regular development
+```
+time (./clean.pl && ./compile.pl -U -DskipTests && ./assemble.pl -p dir -DskipTests); say "OpenNMS may be ready for deployment"
+```
+
+When deploying it to a custom `opennms.home` (i.e. on another machine)
+```
+time (./clean.pl && ./compile.pl -DskipTests && ./assemble.pl -Dopennms.home=/opt/opennms -DskipTests); say "OpenNMS may be ready for deployment"
+```
+
+## Troubleshooting
+
+If you encounter a dependency download or OpenNMS Maven Repositor issue, try rebuilding at least twice before considering it an actual issue.
+Sometimes it requires multiple runs before it actually works.
+This will be solved as soon as the maven repository is populated properly
+
+## Running Tests
+
+There will be a topic talking about running the various tests locally.
+As a general side note however
+*NEVER run ALL unit or integration tests locally.
+This is what Bamboo is for.*
