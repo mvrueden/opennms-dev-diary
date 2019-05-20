@@ -1,0 +1,147 @@
+---
+title: "Setting up OpenNMS Development Environment (MacOS)"
+date: 2019-05-18T10:30:00+01:00
+tags: ["compiling", "development"]
+draft: false
+featured_image: "https://images.pexels.com/photos/761816/pexels-photo-761816.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+---
+:icons: font
+
+Here we cover what is necessary to build OpenNMS from Source and afterwards start it locally on your Mac OS system.
+
+# Compile Prerequisites
+
+In order to compile OpenNMS at least the following requirements should be met:
+
+1. The latest JDK 8 version should be installed
+1. makensis
+1. cloned github OpenNMS repository
+1. maven (optional)
+
+# Run Prerequisites
+
+1. PostgreSQL server
+1. Jicmp, jicmp6 (both optional)
+
+# Satisfy compile Prerequisites
+
+## Install git
+
+Git is required to interact with the OpenNMS' source code repository hosted on link:https://github.com/openNMS/opennms[GitHub].
+
+The easiest way to install `git`, is to just type in `git` in the terminal.
+MacOS asks you to install `XCode Command Line Tools`
+
+image::/context/dev-environment-macos/git-command-line-tools-prompt.png[Xcode Command Line Tools Promopt]
+
+However as we need other dependencies as well, I'd recommend installing homebrew instead.
+
+```
+/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+```
+
+See https://brew.sh/index_de for more details.
+
+This will also install the XCode command line tools and therefore git as well.
+
+Afterwards verify with `git` that it actually works:
+
+```
+> git --version
+git version 2.20.1 (Apple Git-117)
+```
+
+## Install JDK 8
+
+As of writing this article only JDK 8 is supported to build from source. I personally use Oracle JDK 8, but you can also use OpenJDK if you like.
+
+Download Oracle JDK 8 for MacOS from link:https://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html
+[here].
+
+After Installation verify that java has been correclty installed:
+
+```
+> java -version
+java version "1.8.0_211"
+Java(TM) SE Runtime Environment (build 1.8.0_211-b12)
+Java HotSpot(TM) 64-Bit Server VM (build 25.211-b12, mixed mode)
+```
+
+## Windows Installer (Makensis)
+
+When building OpenNMS from source also a windows installer is compiled. In order to do this successfully you can either install the according packages via `brew`:
+
+`brew install makensis`
+
+If you are not interested in the Windows Installer bits, you can also simply use a `nsis.sh` script which simply exists with `0` and put it on your path.
+
+TODO MVR verify this...
+
+Afterwards ensure `makensis` can be invoked from your path:
+
+```
+> makensis
+Usage:
+  makensis [ option | script.nsi | - ] [...]
+```
+
+## Maven (optional)
+
+I personally like to use `mvn` commands instead of `./compile.pl`, `./clean.pl` or `./assemble.pl` in certain cases, therefore maven should also be installed.
+
+`brew install maven`
+
+Simply verify afterwards:
+
+```
+> mvn --version
+Apache Maven 3.6.1 (d66c9c0b3152b2e69ee9bac180bb8fcc8e6af555; 2019-04-04T21:00:29+02:00)
+Maven home: /usr/local/Cellar/maven/3.6.1/libexec
+Java version: 1.8.0_211, vendor: Oracle Corporation, runtime: /Library/Java/JavaVirtualMachines/jdk1.8.0_211.jdk/Contents/Home/jre
+Default locale: en_DE, platform encoding: UTF-8
+OS name: "mac os x", version: "10.14.5", arch: "x86_64", family: "mac"
+```
+
+The version is not that important, but should be anything greater 3.5.2 (as of writing this article)
+
+
+# Satisfy build prerequisites
+
+## JICMP and JICMP 6
+
+`brew install automake`
+`brew install autogen`
+
+### JICMP
+
+```
+git clone https://github.com/OpenNMS/jicmp.git
+cd jicmp
+git submodule update --init --recursive
+autoreconf -fvi
+./configure
+make
+```
+
+### JICMP 6
+
+```
+git clone https://github.com/OpenNMS/jicmp6.git
+cd jicmp6
+git submodule update --init --recursive
+autoreconf -fvi
+./configure
+make
+```
+
+## Postgres
+
+OpenNMS requires a Postgres installation to run.
+I personally use the `Postgres.app` for MacOS.
+Simply download it from link:https://postgresapp.com/de/downloads.html[here] and copy it to your Applications folder.
+
+
+# Fazit
+
+Now everything should be set up to build OpenNMS from source and afterwards run it from the command line.
+In the article link:/posts/development/1-how-to-compile[How to Compile from Source] all the details are covered.
