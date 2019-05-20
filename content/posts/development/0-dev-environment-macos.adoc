@@ -75,8 +75,6 @@ When building OpenNMS from source also a windows installer is compiled. In order
 
 If you are not interested in the Windows Installer bits, you can also simply use a `nsis.sh` script which simply exists with `0` and put it on your path.
 
-TODO MVR verify this...
-
 Afterwards ensure `makensis` can be invoked from your path:
 
 ```
